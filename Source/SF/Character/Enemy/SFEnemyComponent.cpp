@@ -133,7 +133,7 @@ void USFEnemyComponent::OnActorInitStateChanged(const FActorInitStateChangedPara
 
 void USFEnemyComponent::CheckDefaultInitialization()
 {
-	CheckDefaultInitializationForImplementers();
+
 
 	static const TArray<FGameplayTag> StateChain = {
 		SFGameplayTags::InitState_Spawned,
