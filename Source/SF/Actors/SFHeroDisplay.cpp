@@ -5,7 +5,7 @@
 #include "Character/Hero/SFHeroDefinition.h"
 #include "Components/WidgetComponent.h"
 #include "Net/UnrealNetwork.h"
-#include "Test/LobbyUI/SFPlayerInfoWidget.h"
+#include "UI/Lobby/SFPlayerInfoWidget.h"
 
 
 ASFHeroDisplay::ASFHeroDisplay()

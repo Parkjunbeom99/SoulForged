@@ -8,7 +8,7 @@
 #include "Player/SFPlayerInfoTypes.h"
 #include "Player/Lobby/SFLobbyPlayerController.h"
 #include "Player/Lobby/SFLobbyPlayerState.h"
-#include "Test/LobbyUI/SFLobbyWidget.h"
+#include "UI/Lobby/SFLobbyWidget.h"
 
 ASFLobbyGameMode::ASFLobbyGameMode()
 {
