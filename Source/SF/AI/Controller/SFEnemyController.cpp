@@ -59,13 +59,15 @@ ASFEnemyController::ASFEnemyController(const FObjectInitializer& ObjectInitializ
     TargetActor = nullptr;
 }
 
-// [추가] 네트워크 복제 함수
+//네트워크 복제 함수
 void ASFEnemyController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
     // bIsInCombat 복제 (서버 → 클라이언트)
     DOREPLIFETIME(ASFEnemyController, bIsInCombat);
+    DOREPLIFETIME(ASFEnemyController, bHasGuardSlot);
+
 }
 
 void ASFEnemyController::PreInitializeComponents()
@@ -89,7 +91,7 @@ void ASFEnemyController::BeginPlay()
             this, &ASFEnemyController::OnTargetPerceptionUpdated
         );
         
-        // [추가] 완전 소실 (MaxAge 경과)
+        //완전 소실 (MaxAge 경과)
         AIPerception->OnTargetPerceptionForgotten.AddDynamic(
             this, &ASFEnemyController::OnTargetPerceptionForgotten
         );

@@ -45,6 +45,9 @@ protected:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 #pragma region BehaviorTree
+public:
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="AI|State")
+	bool bHasGuardSlot = false;
 protected:
 	void ChangeBehaviorTree(FGameplayTag GameplayTag);
 	
@@ -76,7 +79,7 @@ protected:
     // [수정] Replicated 속성 추가
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="AI|State")
 	bool bIsInCombat;
-
+	
 	// BehaviorTree 실행 오버라이드
 	virtual bool RunBehaviorTree(UBehaviorTree* BehaviorTree) override;
 	
