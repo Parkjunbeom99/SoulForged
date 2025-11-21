@@ -151,8 +151,9 @@ bool ULoadingScreenManager::ShouldCreateSubsystem(UObject* Outer) const
 {
 	// Only clients have loading screens
 	const UGameInstance* GameInstance = CastChecked<UGameInstance>(Outer);
-	const bool bIsServerWorld = GameInstance->IsDedicatedServerInstance();	
-	return !bIsServerWorld;
+	const bool bIsServerWorld = GameInstance->IsDedicatedServerInstance();
+	return false;
+	//return !bIsServerWorld;
 }
 
 void ULoadingScreenManager::Tick(float DeltaTime)
