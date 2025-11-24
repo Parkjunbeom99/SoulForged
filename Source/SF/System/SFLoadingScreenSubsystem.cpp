@@ -1,27 +1,41 @@
 #include "SFLoadingScreenSubsystem.h"
 #include "MoviePlayer.h"
 #include "Framework/Application/SlateApplication.h"
-#include "GameMapsSettings.h"
+#include "SFLogChannels.h"
 #include "Blueprint/UserWidget.h"
+#include "Engine/AssetManager.h"
 #include "Engine/GameViewportClient.h"
+#include "Engine/StreamableManager.h"
+#include "Engine/UserInterfaceSettings.h"
 #include "UI/Slate/SFSimpleLoadingScreen.h"
-
-#include "HAL/IConsoleManager.h"
+#include "Widgets/Layout/SDPIScaler.h"
+#include "Widgets/Layout/SSafeZone.h"
 
 void USFLoadingScreenSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+
+    if (!LoadingConfigTable.IsNull())
+    {
+        FStreamableDelegate OnLoaded = FStreamableDelegate::CreateUObject(
+            this, &USFLoadingScreenSubsystem::OnConfigTableLoaded);
+        
+        ConfigTableLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+            LoadingConfigTable.ToSoftObjectPath(),
+            OnLoaded,
+            FStreamableManager::AsyncLoadHighPriority
+        );
+    }
     
-    // 1. 하드 트래블(OpenLevel) 감지
+    // 하드 트래블(OpenLevel) 감지
     FCoreUObjectDelegates::PreLoadMap.AddUObject(this, &USFLoadingScreenSubsystem::OnPreLoadMap);
 
-    // 2. 맵 로드 완료 감지 (하드/심리스 공통)
+    // 맵 로드 완료 감지 
     FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(this, &USFLoadingScreenSubsystem::OnPostLoadMapWithWorld);
 
-    // 3. 심리스 트래블(ServerTravel) 시작 감지 TODO : CommonLoadingScreen 시스템에서 이를 대체할 예정
-    //FWorldDelegates::OnSeamlessTravelStart.AddUObject(this, &USFLoadingScreenSubsystem::OnSeamlessTravelStart);
+    // 심리스 트레블 감지(로딩 스크린 설정용)
+    FWorldDelegates::OnSeamlessTravelStart.AddUObject(this, &USFLoadingScreenSubsystem::OnSeamlessTravelStart);
     
-    bIsSeamlessTravelInProgress = false;
     bCurrentLoadingScreenStarted = false;
 }
 
@@ -32,6 +46,10 @@ void USFLoadingScreenSubsystem::Deinitialize()
     FCoreUObjectDelegates::PreLoadMap.RemoveAll(this);
     FCoreUObjectDelegates::PostLoadMapWithWorld.RemoveAll(this);
     FWorldDelegates::OnSeamlessTravelStart.RemoveAll(this);
+
+    ConfigTableLoadHandle.Reset();
+    CurrentWidgetLoadHandle.Reset();
+    
 	Super::Deinitialize();
 }
 
@@ -42,20 +60,144 @@ bool USFLoadingScreenSubsystem::ShouldCreateSubsystem(UObject* Outer) const
     return !bIsServerWorld;
 }
 
-void USFLoadingScreenSubsystem::OnPreLoadMap(const FString& MapName)
+void USFLoadingScreenSubsystem::PreloadLoadingScreenForLevel(const FString& NextLevelName)
 {
-    bIsSeamlessTravelInProgress = false;
-    StartLoadingScreen();
+    PendingLevelName = NextLevelName;
+    PreloadedWidgetClass = nullptr; // 리셋
     
+    const FSFMapLoadingConfig* Config = FindLoadingConfigForMap(NextLevelName);
+
+    if (Config && !Config->SeamlessLoadingWidget.IsNull())
+    {
+        // 기존 핸들 해제 (이전 로딩 화면 메모리 해제)
+        if (CurrentWidgetLoadHandle.IsValid())
+        {
+            CurrentWidgetLoadHandle->ReleaseHandle();
+            CurrentWidgetLoadHandle.Reset();
+        }
+
+        // 비동기 로딩 시작
+        TSoftClassPtr<UUserWidget> WidgetPath = Config->SeamlessLoadingWidget;
+        
+        CurrentWidgetLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+            WidgetPath.ToSoftObjectPath(),
+            FStreamableDelegate::CreateUObject(this, &USFLoadingScreenSubsystem::OnLoadingScreenAssetLoaded),
+            FStreamableManager::AsyncLoadHighPriority
+        );
+    }
+    else if (Config && !Config->HardLoadingWidget.IsNull())
+    {
+        if (CurrentWidgetLoadHandle.IsValid())
+        {
+            CurrentWidgetLoadHandle->ReleaseHandle();
+            CurrentWidgetLoadHandle.Reset();
+        }
+
+        TSoftClassPtr<UUserWidget> WidgetPath = Config->HardLoadingWidget;
+        
+        CurrentWidgetLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+            WidgetPath.ToSoftObjectPath(),
+            FStreamableDelegate::CreateUObject(this, &USFLoadingScreenSubsystem::OnLoadingScreenAssetLoaded),
+            FStreamableManager::AsyncLoadHighPriority
+        );
+    }
+    else
+    {
+        UE_LOG(LogSF, Warning, TEXT("[Preload] No config found for level: %s"), *NextLevelName);
+    }
+}
+
+void USFLoadingScreenSubsystem::SetHardLoadingScreenContentWidget(TSubclassOf<UUserWidget> NewWidgetClass)
+{
+    if (HardLoadingScreenWidgetClass != NewWidgetClass)
+    {
+        HardLoadingScreenWidgetClass = NewWidgetClass;
+        OnHardLoadingScreenWidgetChanged.Broadcast(HardLoadingScreenWidgetClass);
+    }
+}
+
+TSubclassOf<UUserWidget> USFLoadingScreenSubsystem::GetHardLoadingScreenContentWidget() const
+{
+    return HardLoadingScreenWidgetClass;
+}
+
+void USFLoadingScreenSubsystem::SetSeamlessLoadingScreenContentWidget(TSubclassOf<UUserWidget> NewWidgetClass)
+{
+    if (SeamlessLoadingScreenWidgetClass != NewWidgetClass)
+    {
+        SeamlessLoadingScreenWidgetClass = NewWidgetClass;
+        OnSeamlessLoadingScreenWidgetChanged.Broadcast(SeamlessLoadingScreenWidgetClass);
+    }
+}
+
+TSubclassOf<UUserWidget> USFLoadingScreenSubsystem::GetSeamlessLoadingScreenContentWidget() const
+{
+    return SeamlessLoadingScreenWidgetClass;
 }
 
 void USFLoadingScreenSubsystem::OnSeamlessTravelStart(UWorld* CurrentWorld, const FString& LevelName)
 {
-    bIsSeamlessTravelInProgress = true;
-    StartLoadingScreen();
+    // 로딩 스크린 출력 관련 처리는 CommonLoadingScreen에서 전담
+
+    // Preload된 위젯이 있고 목적지가 일치하는지 확인
+    FString ShortLevelName = FPackageName::GetShortName(LevelName);
+    FString ShortPendingName = FPackageName::GetShortName(PendingLevelName);
+    
+    if (PreloadedWidgetClass && ShortLevelName == ShortPendingName)
+    {
+        SetSeamlessLoadingScreenContentWidget(PreloadedWidgetClass);
+        
+        // 사용 완료 후 정리
+        PreloadedWidgetClass = nullptr;
+        PendingLevelName.Empty();
+        CurrentWidgetLoadHandle.Reset();
+        return;
+    }
+    
+    // Preload 안 된 경우 - 폴백: 동기 로드
+    const FSFMapLoadingConfig* Config = FindLoadingConfigForMap(LevelName);
+    if (Config && !Config->SeamlessLoadingWidget.IsNull())
+    {
+        // 동기 로드 - 약간의 프레임 드랍 발생 가능
+        TSubclassOf<UUserWidget> WidgetClass = Config->SeamlessLoadingWidget.LoadSynchronous();
+        if (WidgetClass)
+        {
+            SetSeamlessLoadingScreenContentWidget(WidgetClass);
+            UE_LOG(LogSF, Warning, TEXT("[SeamlessTravel] Loaded widget synchronously: %s"), *GetNameSafe(WidgetClass));
+        }
+    }
+    else
+    {
+        UE_LOG(LogSF, Error, TEXT("[SeamlessTravel] No config found for: %s"), *LevelName);
+    }
 }
 
-void USFLoadingScreenSubsystem::StartLoadingScreen()
+void USFLoadingScreenSubsystem::OnPreLoadMap(const FString& MapName)
+{
+    // Hard Travel 전에 위젯 Preload 시도
+    const FSFMapLoadingConfig* Config = FindLoadingConfigForMap(MapName);
+    
+    if (Config && !Config->HardLoadingWidget.IsNull())
+    {
+        // Config는 있지만 아직 Preload 안 된 경우 
+        FString ShortMapName = FPackageName::GetShortName(MapName);
+        FString ShortPendingName = FPackageName::GetShortName(PendingLevelName);
+        
+        if (ShortMapName != ShortPendingName || !PreloadedWidgetClass)
+        {
+            UE_LOG(LogSF, Warning, TEXT("[HardTravel] Widget not preloaded, loading synchronously"));
+            
+            // 동기 로드
+            TSubclassOf<UUserWidget> WidgetClass = Config->HardLoadingWidget.LoadSynchronous();
+            PreloadedWidgetClass = WidgetClass;
+            PendingLevelName = MapName;
+        }
+    }
+    
+    StartHardLoadingScreen();
+}
+
+void USFLoadingScreenSubsystem::StartHardLoadingScreen()
 {
     if (bCurrentLoadingScreenStarted)
     {
@@ -69,34 +211,66 @@ void USFLoadingScreenSubsystem::StartLoadingScreen()
 
     FLoadingScreenAttributes LoadingScreen;
     UGameInstance* LocalGameInstance = GetGameInstance();
-    TSubclassOf<UUserWidget> LoadingScreenWidgetClass = LoadingScreenWidget.TryLoadClass<UUserWidget>();
-    if (UUserWidget* LoadingWidget = UUserWidget::CreateWidgetInstance(*LocalGameInstance, LoadingScreenWidgetClass, NAME_None))
-    {
-        LoadingSWidgetPtr = LoadingWidget->TakeWidget();
-        LoadingScreen.WidgetLoadingScreen = LoadingSWidgetPtr;
-    }
-    else
-    {
-        // 기본적으로 정의한 SSimpleLoadingScreen 사용
-        LoadingScreen.WidgetLoadingScreen = SNew(SSFSimpleLoadingScreen); 
-    }
+    TSubclassOf<UUserWidget> LoadedWidgetClass = HardLoadingScreenWidget.TryLoadClass<UUserWidget>();
     
-    if (bIsSeamlessTravelInProgress)
+    // 표시할 콘텐츠 위젯 준비 (Slate Widget 포인터 확보)
+    TSharedPtr<SWidget> ContentWidget;
+    if (UUserWidget* LoadingWidget = UUserWidget::CreateWidgetInstance(*LocalGameInstance, LoadedWidgetClass, NAME_None))
     {
-        LoadingScreen.bAllowEngineTick = false;   
-        LoadingScreen.bWaitForManualStop = true; 
-        LoadingScreen.bAutoCompleteWhenLoadingCompletes = false;
+        HardLoadingSWidgetPtr = LoadingWidget->TakeWidget();
+        ContentWidget = HardLoadingSWidgetPtr;
     }
     else
     {
-        // 하드 트래블 최적화
-        LoadingScreen.bAllowEngineTick = false; 
-        LoadingScreen.bWaitForManualStop = false;
-        LoadingScreen.bAutoCompleteWhenLoadingCompletes = true;
+        // 위젯 생성 실패 시 기본 로딩 화면 사용
+        ContentWidget = SNew(SSFSimpleLoadingScreen); 
     }
 
+    // 현재 뷰포트 해상도에 따른 DPI Scale 값 계산
+    float CalculatedDPIScale = 1.0f;
+    if (GEngine && GEngine->GameViewport)
+    {
+        FVector2D ViewportSize;
+        GEngine->GameViewport->GetViewportSize(ViewportSize);
+        
+        // 프로젝트 세팅의 DPI 커브를 기반으로 올바른 스케일 값을 가져옴 
+        CalculatedDPIScale = GetDefault<UUserInterfaceSettings>()->GetDPIScaleBasedOnSize(FIntPoint(ViewportSize.X, ViewportSize.Y));
+    }
+
+    // DPI Scale 적용된 콘텐츠 위젯 생성
+    if (ContentWidget.IsValid())
+    {
+        LoadingScreen.WidgetLoadingScreen = SNew(SOverlay)
+        + SOverlay::Slot() // 슬롯 추가
+       .HAlign(HAlign_Fill)
+       .VAlign(VAlign_Fill)
+        [   // 슬롯 내용 시작
+            SNew(SSafeZone) // 모바일/콘솔 안전 구역 확보
+           .HAlign(HAlign_Fill)
+           .VAlign(VAlign_Fill)
+           .IsTitleSafe(true)
+            [   // SafeZone 자식 시작
+                SNew(SDPIScaler) // DPI 스케일링 적용
+               .DPIScale(CalculatedDPIScale)
+                [   // DPIScaler 자식 시작
+                    ContentWidget.ToSharedRef() // 실제 콘텐츠 위젯
+                ]
+            ]
+        ];
+    }
+
+    // 만약 없으면 HostLoadingScreen(부모 위젯)의 기본 검은 화면이 보일 것
+    if (PreloadedWidgetClass)
+    {
+        SetHardLoadingScreenContentWidget(PreloadedWidgetClass);
+    }
+    
+    // 하드 트래블 최적화
+    LoadingScreen.bAllowEngineTick = false; 
+    LoadingScreen.bWaitForManualStop = false;
+    LoadingScreen.bAutoCompleteWhenLoadingCompletes = true;
     LoadingScreen.bMoviesAreSkippable = false;
-    LoadingScreen.MinimumLoadingScreenDisplayTime = 3.0f; // 최소 노출 시간
+    LoadingScreen.MinimumLoadingScreenDisplayTime = 3.0f; // 최소 로딩 스크린 표시 시간
     LoadingScreen.PlaybackType = MT_Normal;
 
     GetMoviePlayer()->SetupLoadingScreen(LoadingScreen);
@@ -113,32 +287,14 @@ void USFLoadingScreenSubsystem::StartLoadingScreen()
 
 void USFLoadingScreenSubsystem::OnPostLoadMapWithWorld(UWorld* LoadedWorld)
 {
-    FString LoadedMapName = LoadedWorld->GetPackage()->GetName();
-    if (bIsSeamlessTravelInProgress)
+    if (bCurrentLoadingScreenStarted)
     {
-        if (IsInSeamlessTravel())
-        {
-            return; 
-        }
-        else
-        {
-            if (bCurrentLoadingScreenStarted)
-            {
-                //StopLoadingScreen();
-            }
-        }
-    }
-    else
-    {
-        if (bCurrentLoadingScreenStarted)
-        {
-            // 하드 트래블 완료 (bAutoCompleteWhenLoadingCompletes=true라면 엔진이 알아서 끄지만 명시적으로 호출)
-            StopLoadingScreen();
-        }
+        // 하드 트래블 완료 (bAutoCompleteWhenLoadingCompletes=true라면 엔진이 알아서 끄지만 명시적으로 호출)
+        StopHardLoadingScreen();
     }
 }
 
-void USFLoadingScreenSubsystem::StopLoadingScreen()
+void USFLoadingScreenSubsystem::StopHardLoadingScreen()
 {
     GetMoviePlayer()->StopMovie();
     
@@ -154,39 +310,76 @@ void USFLoadingScreenSubsystem::StopLoadingScreen()
 void USFLoadingScreenSubsystem::RemoveWidgetFromViewport()
 {
     UGameInstance* LocalGameInstance = GetGameInstance();
-    if (LoadingSWidgetPtr.IsValid())
+    if (HardLoadingSWidgetPtr.IsValid())
     {
         if (UGameViewportClient* GameViewportClient = LocalGameInstance->GetGameViewportClient())
         {
-            GameViewportClient->RemoveViewportWidgetContent(LoadingSWidgetPtr.ToSharedRef());
+            GameViewportClient->RemoveViewportWidgetContent(HardLoadingSWidgetPtr.ToSharedRef());
         }
-        LoadingSWidgetPtr.Reset();
+        HardLoadingSWidgetPtr.Reset();
     }
 }
 
-bool USFLoadingScreenSubsystem::IsInSeamlessTravel()
+const FSFMapLoadingConfig* USFLoadingScreenSubsystem::FindLoadingConfigForMap(const FString& MapName)
 {
-    if (UWorld* World = GetWorld())
+    UDataTable* ConfigTable = LoadingConfigTable.LoadSynchronous();
+    if (!ConfigTable)
     {
-        if (GEngine)
-        {
-            // 현재 월드 컨텍스트의 트래블 핸들러 상태 확인
-            FSeamlessTravelHandler& TravelHandler = GEngine->SeamlessTravelHandlerForWorld(World);
-            return TravelHandler.IsInTransition();
-        }
+        return nullptr;
     }
-    return false;
-}
-
-bool USFLoadingScreenSubsystem::IsTransitionMap(const FString& MapName)
-{
-    if (UGameMapsSettings* GameMapsSettings = UGameMapsSettings::GetGameMapsSettings())
-    {
-        // 프로젝트 세팅에 설정된 트랜지션 맵 이름과 비교
-        const FString TransitionMapName = UGameMapsSettings::GetGameMapsSettings()->TransitionMap.GetLongPackageName();
     
-        // 경로 포함 비교 또는 이름만 비교
-        return MapName.Contains(TransitionMapName) || TransitionMapName.Contains(MapName);
+    // 맵 이름에서 경로만 제거 (짧은 이름만 추출)
+    FString ShortMapName = FPackageName::GetShortName(MapName);
+
+    // DataTable에서 정확히 일치하는 Row 찾기
+    FSFMapLoadingConfig* Config = ConfigTable->FindRow<FSFMapLoadingConfig>(
+        FName(*ShortMapName), 
+        TEXT("FindLoadingConfig")
+    );
+    
+    if (Config)
+    {
+        return Config;
     }
-    return false;
+
+    return nullptr;
+}
+
+void USFLoadingScreenSubsystem::OnConfigTableLoaded()
+{
+    CachedConfigTable = LoadingConfigTable.Get();
+    
+    if (CachedConfigTable)
+    {
+        UE_LOG(LogSF, Log, TEXT("[LoadingScreenSubsystem] Config table loaded successfully"));
+    }
+    else
+    {
+        UE_LOG(LogSF, Error, TEXT("[LoadingScreenSubsystem] Failed to load config table!"));
+    }
+    
+    ConfigTableLoadHandle.Reset();
+}
+
+void USFLoadingScreenSubsystem::OnLoadingScreenAssetLoaded()
+{
+    if (!CurrentWidgetLoadHandle.IsValid())
+    {
+        return;
+    }
+    
+    // 로드된 위젯 클래스 가져오기
+    UObject* LoadedAsset = CurrentWidgetLoadHandle->GetLoadedAsset();
+    
+    if (UClass* WidgetClass = Cast<UClass>(LoadedAsset))
+    {
+        if (WidgetClass->IsChildOf(UUserWidget::StaticClass()))
+        {
+            PreloadedWidgetClass = TSubclassOf<UUserWidget>(WidgetClass);
+        }
+    }
+    else
+    {
+        UE_LOG(LogSF, Error, TEXT("[Preload] Failed to load asset for level: %s"), *PendingLevelName);
+    }
 }
