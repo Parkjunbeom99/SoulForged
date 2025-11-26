@@ -14,7 +14,6 @@
 #include "Messages/SFMessageGameplayTags.h"
 #include "Messages/SFPortalInfoMessages.h"
 #include "Net/UnrealNetwork.h"
-#include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 #include "System/SFAssetManager.h"
 
 ASFPlayerState::ASFPlayerState(const FObjectInitializer& ObjectInitializer)
@@ -35,6 +34,7 @@ void ASFPlayerState::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>&
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(ThisClass, PlayerSelection);
+	DOREPLIFETIME(ThisClass, Credits);
 	DOREPLIFETIME(ThisClass, bIsReadyForTravel);
 	
 	FDoRepLifetimeParams SharedParams;
@@ -65,46 +65,20 @@ void ASFPlayerState::CopyProperties(APlayerState* PlayerState)
 	Super::CopyProperties(PlayerState);
 
 	ASFPlayerState* NewPlayerState = Cast<ASFPlayerState>(PlayerState);
-	if (NewPlayerState)
-	{
-		NewPlayerState->SetPlayerSelection(PlayerSelection);
-	}
-
-	if (AbilitySystemComponent)
-	{
-		// 현재 ASC의 상태를 NewPlayerState의 SavedASCData 배열에 기록
-		FMemoryWriter MemWriter(NewPlayerState->SavedASCData);
-        
-		// SaveGame 플래그가 붙은 변수들을 텍스트가 아닌 바이너리로 이름은 문자열로 매핑하여 저장
-		FObjectAndNameAsStringProxyArchive Ar(MemWriter, true);
-		Ar.ArIsSaveGame = true; // SaveGame 태그가 붙은 속성만 저장
-
-		// ASC 전체 직렬화 수행
-		AbilitySystemComponent->Serialize(Ar);
-	}
-}
-
-void ASFPlayerState::RestorePersistedData()
-{
-	// 저장된 데이터가 없거나 ASC가 없으면 중단
-	if (SavedASCData.Num() == 0 ||!AbilitySystemComponent)
+	if (!NewPlayerState)
 	{
 		return;
 	}
 
-	// GAS 상태 역직렬화
-	FMemoryReader MemReader(SavedASCData);
-	FObjectAndNameAsStringProxyArchive Ar(MemReader, true);
-	Ar.ArIsSaveGame = true; // 저장할 때와 동일한 설정
+	NewPlayerState->SetPlayerSelection(PlayerSelection);
 
-	// 바이트 배열에서 ASC로 데이터 덮어쓰기
-	AbilitySystemComponent->Serialize(Ar);
-
-	// 복원된 데이터를 클라이언트들에게 강제 동기화 
-	AbilitySystemComponent->ForceReplication();
-    
-	// 데이터 사용 후 버퍼 비우기 
-	SavedASCData.Empty();
+	// ASC 데이터 저장
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->SaveAttributesToData(NewPlayerState->SavedASCData);
+		AbilitySystemComponent->SaveAbilitiesToData(NewPlayerState->SavedASCData);
+		AbilitySystemComponent->SaveGameplayEffectsToData(NewPlayerState->SavedASCData);
+	}
 }
 
 void ASFPlayerState::OnDeactivated()
@@ -241,16 +215,25 @@ void ASFPlayerState::SetPawnData(const USFPawnData* InPawnData)
 	MARK_PROPERTY_DIRTY_FROM_NAME(ThisClass, PawnData, this);
 	PawnData = InPawnData;
 
-	// PawnData의 AbilitySet을 순회하며, ASC에 Ability를 할당
-	// - 이 과정에서 ASC의 ActivatableAbilities에 추가됨
-	for (const USFAbilitySet* AbilitySet : PawnData->AbilitySets)
+	const bool bHasSavedAbilities = HasSavedAbilitySystemData();
+	
+	if (bHasSavedAbilities)
 	{
-		if (AbilitySet)
+		RestorePersistedAbilityData();
+	}
+	else
+	{
+		// PawnData의 AbilitySet을 순회하며, ASC에 Ability를 할당
+		// - 이 과정에서 ASC의 ActivatableAbilities에 추가됨
+		for (const USFAbilitySet* AbilitySet : PawnData->AbilitySets)
 		{
-			AbilitySet->GiveToAbilitySystem(AbilitySystemComponent, nullptr);
+			if (AbilitySet)
+			{
+				AbilitySet->GiveToAbilitySystem(AbilitySystemComponent, nullptr);
+			}
 		}
 	}
-
+	
 	ForceNetUpdate();
 }
 
@@ -280,6 +263,31 @@ void ASFPlayerState::SetPlayerConnectionType(ESFPlayerConnectionType NewType)
 	MyPlayerConnectionType = NewType;
 }
 
+void ASFPlayerState::RestorePersistedAbilityData()
+{
+	if (!SavedASCData.IsValid())
+	{
+		UE_LOG(LogSF, Log, TEXT("RestorePersistedAbilityData: No saved data for %s"), *GetPlayerName());
+		return;
+	}
+
+	if (!AbilitySystemComponent)
+	{
+		return;
+	}
+
+	// ASC 데이터 복원
+	AbilitySystemComponent->RestoreAttributesFromData(SavedASCData);
+	AbilitySystemComponent->RestoreAbilitiesFromData(SavedASCData);
+	AbilitySystemComponent->RestoreGameplayEffectsFromData(SavedASCData);
+
+	// 클라이언트에 강제 동기화
+	AbilitySystemComponent->ForceReplication();
+
+	// 버퍼 비우기
+	SavedASCData.Reset();
+}
+
 void ASFPlayerState::OnRep_PlayerSelection()
 {
 	OnPlayerInfoChanged.Broadcast(PlayerSelection);
@@ -294,3 +302,4 @@ void ASFPlayerState::OnRep_IsReadyForTravel()
 	Message.bIsReadyToTravel = bIsReadyForTravel;
 	MessageSubsystem.BroadcastMessage(SFGameplayTags::Message_Player_TravelReadyChanged, Message);
 }
+

@@ -4,6 +4,7 @@
 #include "AbilitySystemInterface.h"
 #include "SFPlayerInfoTypes.h"
 #include "GameFramework/PlayerState.h"
+#include "Save/SFPersistentDataType.h"
 #include "SFPlayerState.generated.h"
 
 class USFCombatSet_Hero;
@@ -77,13 +78,16 @@ public:
 	virtual void OnReactivated() override;
 	//~End of APlayerState interface
 
-	// Seamless Travel 후 데이터를 복원하는 함수 
-	void RestorePersistedData();
-
 	void SetPlayerConnectionType(ESFPlayerConnectionType NewType);
 	ESFPlayerConnectionType GetPlayerConnectionType() const { return MyPlayerConnectionType; }
 	const USFPrimarySet_Hero* GetPrimarySet() const { return PrimarySet; }
 	const USFCombatSet_Hero* GetCombatSet() const { return CombatSet; }
+
+	// 저장된 어빌리티 시스템 데이터가 있는지 (초기 PawnData AbilitySet 부여 스킵 판단용) 
+	bool HasSavedAbilitySystemData() const { return SavedASCData.IsValid(); }
+	
+	// Seamless Travel 후 ASC 데이터 복원
+	void RestorePersistedAbilityData();
 
 private:
 	void OnPawnDataLoadComplete(const USFPawnData* LoadedPawnData);
@@ -116,10 +120,10 @@ private:
 	TObjectPtr<USFAbilitySystemComponent> AbilitySystemComponent;
 
 	UPROPERTY()
-	TObjectPtr<const USFPrimarySet_Hero> PrimarySet;
+	TObjectPtr<USFPrimarySet_Hero> PrimarySet;
 
 	UPROPERTY()
-	TObjectPtr<const USFCombatSet_Hero> CombatSet;
+	TObjectPtr<USFCombatSet_Hero> CombatSet;
 
 	UPROPERTY(Replicated)
 	ESFPlayerConnectionType MyPlayerConnectionType;
@@ -129,7 +133,11 @@ private:
     
 	TSharedPtr<FStreamableHandle> PawnDataHandle;
 
-	// Seamless Travel 간 ASC 데이터를 전달하기 위한 임시 버퍼
+	// 재화 
+	UPROPERTY(Replicated)
+	int32 Credits = 0;
+
+	// Seamless Travel 간 ASC 데이터 저장용
 	UPROPERTY()
-	TArray<uint8> SavedASCData;
+	FSFSavedAbilitySystemData SavedASCData;
 };
