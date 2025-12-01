@@ -17,8 +17,8 @@ ASFEquipmentBase::ASFEquipmentBase(const FObjectInitializer& ObjectInitializer)
 	SetRootComponent(ArrowComponent);
 	
 	MeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>("WeaponMesh");
+	MeshComponent->SetCollisionProfileName("Weapon");
 	MeshComponent->SetGenerateOverlapEvents(false);
-	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	MeshComponent->SetupAttachment(GetRootComponent());
 	MeshComponent->PrimaryComponentTick.bStartWithTickEnabled = false;
 	MeshComponent->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;

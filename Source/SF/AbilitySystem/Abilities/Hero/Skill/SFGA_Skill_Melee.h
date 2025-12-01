@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AbilitySystem/Abilities/SFGameplayAbility.h"
+#include "AbilitySystem/Abilities/Hero/SFGA_Equipment_Base.h"
 #include "SFGA_Skill_Melee.generated.h"
 
 class ASFEquipmentBase;
@@ -11,7 +11,7 @@ class ASFEquipmentBase;
  * 
  */
 UCLASS()
-class SF_API USFGA_Skill_Melee : public USFGameplayAbility
+class SF_API USFGA_Skill_Melee : public USFGA_Equipment_Base
 {
 	GENERATED_BODY()
 

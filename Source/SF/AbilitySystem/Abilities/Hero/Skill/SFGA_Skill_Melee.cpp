@@ -17,6 +17,8 @@ USFGA_Skill_Melee::USFGA_Skill_Melee(const FObjectInitializer& ObjectInitializer
 void USFGA_Skill_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+
+	ResetHitActors();
 }
 
 void USFGA_Skill_Melee::ParseTargetData(const FGameplayAbilityTargetDataHandle& InTargetDataHandle, TArray<int32>& OutActorsHitIndexes)

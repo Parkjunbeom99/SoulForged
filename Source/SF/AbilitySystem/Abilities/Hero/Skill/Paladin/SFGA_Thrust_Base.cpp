@@ -50,11 +50,12 @@ void USFGA_Thrust_Base::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	if (UAbilityTask_WaitGameplayEvent* ThrustBeginEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, SFGameplayTags::GameplayEvent_Montage_Begin, nullptr, true, true))
 	{
 		ThrustBeginEventTask->EventReceived.AddDynamic(this, &ThisClass::OnThrustBegin);
-		
+		ThrustBeginEventTask->ReadyForActivation();
 	}
 	if (UAbilityTask_WaitGameplayEvent* ThrustEndEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, SFGameplayTags::GameplayEvent_Montage_End, nullptr, true, true))
 	{
 		ThrustEndEventTask->EventReceived.AddDynamic(this, &ThisClass::OnThrustEnd);
+		ThrustEndEventTask->ReadyForActivation();
 	}
 }
 

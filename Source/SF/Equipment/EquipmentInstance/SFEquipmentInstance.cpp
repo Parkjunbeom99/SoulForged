@@ -7,28 +7,27 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Pawn.h"
 #include "AbilitySystem/Abilities/SFGameplayAbility.h"
+#include "Equipment/EquipmentComponent/SFEquipmentComponent.h"
+#include "Net/UnrealNetwork.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(SFEquipmentInstance)
 
-void FSFEquipmentList::DestroySpawnedActors()
+USFEquipmentInstance::USFEquipmentInstance(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
 {
-	// 직접 Destroy만 호출 (배열 순회 중 Remove 호출 방지)
-	for (AActor* Actor : SpawnedActors)
-	{
-		if (Actor && !Actor->IsPendingKillPending())
-		{
-			Actor->Destroy();
-		}
-	}
-	SpawnedActors.Empty();
 }
 
+void USFEquipmentInstance::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    UObject::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-
+    DOREPLIFETIME(ThisClass, EquipmentDefinition);
+    DOREPLIFETIME(ThisClass, Instigator);
+    DOREPLIFETIME(ThisClass, SpawnedActors);
+}
 
 void USFEquipmentInstance::Initialize(USFEquipmentDefinition* InDefinition, APawn* InPawn, UAbilitySystemComponent* ASC)
 {
-
     if (!InDefinition || !InPawn)
     {
         return;
@@ -43,8 +42,9 @@ void USFEquipmentInstance::Initialize(USFEquipmentDefinition* InDefinition, APaw
     {
         GrantAbilities(ASC);
     }
+
+    // Listen Server 로직
     ApplyAnimationLayer();
-    
 }
 
 void USFEquipmentInstance::SpawnEquipmentActors()
@@ -98,7 +98,6 @@ void USFEquipmentInstance::SpawnEquipmentActors()
         // Pawn의 mesh에 Attach
         if (PawnMesh)
         {
-            
             if (SpawnInfo.AttachSocket == NAME_None || 
                 !PawnMesh->DoesSocketExist(SpawnInfo.AttachSocket))
             {
@@ -113,12 +112,21 @@ void USFEquipmentInstance::SpawnEquipmentActors()
             );
             
             SpawnedActor->SetActorRelativeTransform(SpawnInfo.AttachTransform);
+            SpawnedActors.Add(SpawnedActor);
         }
-
-        //List에 추가
-        SpawnedActorList.SpawnedActors.Add(SpawnedActor);
-        
     }
+}
+
+void USFEquipmentInstance::DestroyEquipmentActors()
+{
+    for (AActor* Actor : SpawnedActors)
+    {
+        if (Actor && !Actor->IsPendingKillPending())
+        {
+            Actor->Destroy();
+        }
+    }
+    SpawnedActors.Empty();
 }
 
 void USFEquipmentInstance::GrantAbilities(UAbilitySystemComponent* ASC)
@@ -147,9 +155,8 @@ void USFEquipmentInstance::GrantAbilities(UAbilitySystemComponent* ASC)
     
 }
 
-void USFEquipmentInstance::Deinitialize(UAbilitySystemComponent* ASC)
+void USFEquipmentInstance::RemoveAbilities(UAbilitySystemComponent* ASC)
 {
-    // 어빌리티 제거 
     if (ASC)
     {
         for (const FGameplayAbilitySpecHandle& Handle : GrantedAbilityHandles)
@@ -170,18 +177,28 @@ void USFEquipmentInstance::Deinitialize(UAbilitySystemComponent* ASC)
         }
         GrantedEffectHandles.Empty();
     }
+}
 
-    // 애니메이션 레이어 제거
+void USFEquipmentInstance::Deinitialize(UAbilitySystemComponent* ASC)
+{
+    // 어빌리티 제거 
+    if (ASC)
+    {
+        RemoveAbilities(ASC);
+    }
+
+    // Listen Server 로직
     RemoveAnimationLayer();
 
     // 스폰된 Actor 제거
-    SpawnedActorList.DestroySpawnedActors();
+    DestroyEquipmentActors();
 
     //참조 정리
     EquipmentDefinition = nullptr;
     Instigator = nullptr;
     
 }
+
 void USFEquipmentInstance::ApplyAnimationLayer()
 {
     if (!EquipmentDefinition || !Instigator)
@@ -200,9 +217,12 @@ void USFEquipmentInstance::ApplyAnimationLayer()
         return;
     }
 
-    // 3. Animation Layer 적용
-    PawnMesh->LinkAnimClassLayers(AnimLayerInfo);
-    
+    // 이미 링크되어 있는지 확인
+    if (PawnMesh->GetLinkedAnimLayerInstanceByClass(AnimLayerInfo) == nullptr)
+    {
+        // Animation Layer 적용
+        PawnMesh->LinkAnimClassLayers(AnimLayerInfo);
+    }
 }
 
 void USFEquipmentInstance::RemoveAnimationLayer()
@@ -227,4 +247,24 @@ void USFEquipmentInstance::RemoveAnimationLayer()
     // Animation Layer 제거
     PawnMesh->UnlinkAnimClassLayers(AnimLayerInfo);
     
+}
+
+void USFEquipmentInstance::OnEquipped()
+{
+    ApplyAnimationLayer();
+}
+
+void USFEquipmentInstance::OnUnequipped()
+{
+    RemoveAnimationLayer();
+}
+
+void USFEquipmentInstance::OnRep_EquipmentDefinition()
+{
+    OnEquipped();
+}
+
+void USFEquipmentInstance::OnRep_Instigator()
+{
+    OnEquipped();
 }
