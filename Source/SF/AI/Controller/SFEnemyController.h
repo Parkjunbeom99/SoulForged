@@ -30,7 +30,8 @@ public:
 	void SetBehaviourContainer(FSFBehaviourWrapperContainer InBehaviorTreeContainer){ BehaviorTreeContainer = InBehaviorTreeContainer; }
 
 	USFEnemyCombatComponent* GetCombatComponent() const { return CombatComponent; }
-	
+
+	void InitializeController();
 protected:
 
 	virtual void PreInitializeComponents() override;
