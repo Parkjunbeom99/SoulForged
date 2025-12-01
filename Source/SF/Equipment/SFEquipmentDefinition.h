@@ -7,7 +7,7 @@
 #include "Engine/DataAsset.h"
 #include "SFEquipmentDefinition.generated.h"
 
-class UAnimLayerInterface;
+class UAnimInstance;
 class USFGameplayAbility;
 class USFEquipmentInstance;
 
@@ -16,12 +16,14 @@ struct FEquipmentAnimLayer
 {
 	GENERATED_BODY()
 
-	// Animation Layer 적용
-	UPROPERTY(EditDefaultsOnly)
-	TSubclassOf<UAnimLayerInterface> AnimLayer;
+	// Animation Layer를 구현한 AnimInstance 클래스
+	// 주의: LinkAnimClassLayers는 AnimInstance 클래스를 받으므로, 
+	// Animation Layer Interface를 구현한 AnimInstance 클래스를 여기에 설정해야 함
+	UPROPERTY(EditDefaultsOnly, Category = "Animation")
+	TSubclassOf<UAnimInstance> AnimLayerClass;
 
-	// 무기 장착 시 활성화할 Tag (Weapon.Rifle)
-	UPROPERTY(EditDefaultsOnly)
+	// 무기 장착 시 활성화할 Tag (선택사항)
+	UPROPERTY(EditDefaultsOnly, Category = "Animation")
 	FGameplayTag GameplayTag;
 };
 
