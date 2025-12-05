@@ -7,7 +7,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Camera/PlayerCameraManager.h"
 #include "UI/Common/CommonBarBase.h"
-#include "UI/Enemy/USFEnemyWidget.h"
+
 
 USFEnemyWidgetComponent::USFEnemyWidgetComponent()
 {
@@ -39,8 +39,8 @@ void USFEnemyWidgetComponent::OnHealthChanged(const FOnAttributeChangeData& OnAt
         const USFPrimarySet_Enemy* PrimarySet = ASC->GetSet<USFPrimarySet_Enemy>();
         if (IsValid(PrimarySet))
         {
-           int Health = PrimarySet->GetHealth();
-           int MaxHealth = PrimarySet->GetMaxHealth();
+           float Health = PrimarySet->GetHealth();
+           float MaxHealth = PrimarySet->GetMaxHealth();
            float Percent = Health / MaxHealth;
            EnemyWidget->SetPercentVisuals(Percent);
             
