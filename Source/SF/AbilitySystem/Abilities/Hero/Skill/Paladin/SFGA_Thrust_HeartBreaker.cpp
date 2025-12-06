@@ -11,6 +11,8 @@
 #include "MotionWarpingComponent.h"
 #include "AbilitySystem/GameplayEffect/Hero/EffectContext/SFTargetDataTypes.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
+#include "Messages/SFMessageGameplayTags.h"
+#include "Messages/SFSkillInfoMessages.h"
 #include "Weapons/Actor/SFEquipmentBase.h"
 
 USFGA_Thrust_HeartBreaker::USFGA_Thrust_HeartBreaker(FObjectInitializer const& ObjectInitializer)
@@ -62,6 +64,8 @@ void USFGA_Thrust_HeartBreaker::ActivateAbility(const FGameplayAbilitySpecHandle
 		{
 			TotalChargeTime += PhaseTime;
 		}
+		
+		// UI 표시
 		BroadcastUIConstruct(true);
 		// UI 갱신을 위한 Phase 타이머 시작
 		StartPhaseTimer();
@@ -305,27 +309,38 @@ void USFGA_Thrust_HeartBreaker::OnRushMontageFinished()
 
 void USFGA_Thrust_HeartBreaker::ResetCharge()
 {
-	// TODO : UI 숨기기 (GameplayMessage 전달)
-
 	CurrentPhaseIndex = 0;
 	TotalChargeTime = 0.f;
 }
 
-
 void USFGA_Thrust_HeartBreaker::BroadcastUIConstruct(bool bShow)
 {
 	UGameplayMessageSubsystem& MessageSubsystem = UGameplayMessageSubsystem::Get(this);
-	if (bShow)
-	{
-		// TODO : UI 표시
-	}
+
+	FSFSkillProgressInfoMessage ProgressInfoMessage;
+	ProgressInfoMessage.bShouldShow = bShow;
+	ProgressInfoMessage.DisplayName = Name;
+	ProgressInfoMessage.PhaseColor = PhaseColors[CurrentPhaseIndex];
+	ProgressInfoMessage.TotalSkillTime = TotalChargeTime;
+	MessageSubsystem.BroadcastMessage(SFGameplayTags::Message_Skill_ProgressInfoChanged, ProgressInfoMessage);
 }
 
 void USFGA_Thrust_HeartBreaker::BroadcastUIRefresh(int32 NewPhaseIndex)
 {
 	UGameplayMessageSubsystem& MessageSubsystem = UGameplayMessageSubsystem::Get(this);
 
-	// TODO : 페이즈별 UI 색상 등 갱신
+	if (CurrentPhaseIndex < PhaseTimes.Num())
+	{
+		FSFSkillProgressRefreshMessage Message;
+		Message.PhaseColor = PhaseColors[NewPhaseIndex];
+		MessageSubsystem.BroadcastMessage(SFGameplayTags::Message_Skill_ProgressRefresh, Message);
+	}
+	else
+	{
+		FSFSkillProgressRefreshMessage Message;
+		Message.PhaseColor = PhaseColors[MaxPhaseIndex];
+		MessageSubsystem.BroadcastMessage(SFGameplayTags::Message_Skill_ProgressRefresh, Message);
+	}
 }
 
 float USFGA_Thrust_HeartBreaker::GetPhaseDamage() const
@@ -379,6 +394,7 @@ void USFGA_Thrust_HeartBreaker::EndAbility(const FGameplayAbilitySpecHandle Hand
 		}
 	}
 
+	// 타겟 데이터 델리게이트 해제
 	if (ActorInfo->IsNetAuthority() && ServerTargetDataDelegateHandle.IsValid())
 	{
 		USFAbilitySystemComponent* ASC = GetSFAbilitySystemComponentFromActorInfo();
