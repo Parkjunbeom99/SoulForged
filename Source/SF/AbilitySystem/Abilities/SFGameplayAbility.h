@@ -32,6 +32,9 @@ public:
 	USFAbilitySystemComponent* GetSFAbilitySystemComponentFromActorInfo() const;
 
 	UFUNCTION(BlueprintCallable, Category = "SF|Ability")
+	ASFPlayerController* GetSFPlayerControllerFromActorInfo() const;
+	
+	UFUNCTION(BlueprintCallable, Category = "SF|Ability")
 	ASFCharacterBase* GetSFCharacterFromActorInfo() const;
 	
 	ESFAbilityActivationPolicy GetActivationPolicy() const { return ActivationPolicy; }
