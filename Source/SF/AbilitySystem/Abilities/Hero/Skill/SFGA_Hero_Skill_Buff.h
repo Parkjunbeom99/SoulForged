@@ -2,11 +2,9 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/SFGameplayAbility.h"
+#include "GameplayTagContainer.h"
 #include "SFGA_Hero_Skill_Buff.generated.h"
 
-class UParticleSystem;
-class USoundBase;
-class USceneComponent;
 class UGameplayEffect;
 class UAnimMontage;
 
@@ -19,50 +17,73 @@ public:
 	USFGA_Hero_Skill_Buff(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 protected:
-	//스킬 사용 애님 몽타주
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="SF|Buff|Animation")
+
+//=========================Ability Data=========================
+//스킬 공통 정보(몽타주/버프/레벨)
+	UPROPERTY(EditDefaultsOnly, Category="SF|Animation")
 	UAnimMontage* BuffMontage;
-	//스킬 사용 이펙트
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="SF|Buff|Visual")
-	UParticleSystem* BuffParticleSystem;
-	//스킬 사용 사운드
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="SF|Buff|Audio")
-	USoundBase* BuffSound;
 
-	//적용할 버프 GE
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="SF|Buff|Effect")
+	UPROPERTY(EditDefaultsOnly, Category="SF|BuffEffect")
 	TSubclassOf<UGameplayEffect> BuffEffectClass;
-	//GE 레벨
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="SF|Buff|Effect")
+
+	UPROPERTY(EditDefaultsOnly, Category="SF|BuffEffect")
 	int32 BuffLevel = 1;
+//==============================================================
 
-	//FX 통합 관리용
+
+//=========================GameplayCue Tags=========================
+//Skill Event → GroundCue → AuraCue 로 이어지는 구조
+	UPROPERTY(EditDefaultsOnly, Category="SF|Cue")
+	FGameplayTag StartEventTag;
+
+	UPROPERTY(EditDefaultsOnly, Category="SF|Cue")
+	FGameplayTag GroundCueTag;
+
+	UPROPERTY(EditDefaultsOnly, Category="SF|Cue")
+	FGameplayTag AuraCueTag;
+//=================================================================
+
+
+//=========================Aura Tracking=========================
+//Aura가 적용된 Actor 목록 및 GE Handle 저장
 	UPROPERTY()
-	TArray<USceneComponent*> ActiveFXComponents;
+	TMap<AActor*, FActiveGameplayEffectHandle> ActiveAuraEffects;
+//================================================================
 
-protected:
-	//이펙트 & 사운드 재생
-	virtual void SpawnBuffVisualsAndAudio(const FGameplayAbilityActorInfo* ActorInfo);
 
-	//실제 버프 적용 로직
-	virtual void ApplyBuffEffectToTargets(
-		const FGameplayAbilitySpecHandle Handle,
-		const FGameplayAbilityActorInfo* ActorInfo,
-		const FGameplayAbilityActivationInfo ActivationInfo);
+//==========================Skill Event==========================
+//GameplayEvent를 수신하면 GroundCue 실행 후 로직 호출
+	UFUNCTION()
+	void OnReceivedSkillEvent(FGameplayEventData Payload);
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnSkillEventTriggered();
+	virtual void OnSkillEventTriggered_Implementation();
+//================================================================
+
+
+//=======================Aura Process============================
+//Player 태그가 있는 Actor만 Aura 및 GE 적용
+	virtual void ApplyAura(AActor* Target);
+	virtual void RemoveAura(AActor* Target);
+//================================================================
+
 
 public:
-	//Ability 시작
+
+//=======================Ability Lifecycle=======================
+//활성화 & 종료(몽타주 재생/큐 제거/Aura 제거 처리)
 	virtual void ActivateAbility(
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		const FGameplayEventData* TriggerEventData) override;
 
-	//Ability 종료
 	virtual void EndAbility(
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		bool bReplicateEndAbility,
 		bool bWasCancelled) override;
+//===============================================================
 };
