@@ -10,6 +10,7 @@
 #include "AbilitySystem/Attributes/Enemy/SFCombatSet_Enemy.h"
 #include "AbilitySystem/Attributes/Enemy/SFPrimarySet_Enemy.h"
 #include "AbilitySystem/GameplayEvent/SFGameplayEventTags.h"
+#include "AI/Controller/SFEnemyController.h"
 #include "Character/SFPawnData.h"
 #include "Character/SFPawnExtensionComponent.h"
 #include "Component/SFEnemyMovementComponent.h"
@@ -176,6 +177,20 @@ void ASFEnemy::InitializeMovementComponent()
 	
 }
 
+FGenericTeamId ASFEnemy::GetGenericTeamId() const
+{
+	// [수정] 변수명 충돌 방지를 위해 Controller -> EnemyController 로 변경
+	if (ASFEnemyController* EnemyController = Cast<ASFEnemyController>(GetController()))
+	{
+		return EnemyController->GetGenericTeamId();
+	}
+	else
+	{
+		return Super::GetGenericTeamId();    
+	}
+	
+}
+
 #pragma endregion
 
 void ASFEnemy::GrantAbilitiesFromPawnData()
@@ -233,6 +248,17 @@ void ASFEnemy::SetLastAttacker(AActor* Attacker)
 	}
 	
 	LastAttacker = Attacker;
+
+	// [추가] 공격자가 있다면 컨트롤러에게 타겟 강제 변경 요청
+	if (Attacker)
+	{
+		// 내 컨트롤러를 ASFEnemyController로 캐스팅하여 함수 호출
+		if (ASFEnemyController* AIC = Cast<ASFEnemyController>(GetController()))
+		{
+			AIC->SetTargetForce(Attacker);
+		}
+	}
+
 	OnRep_LastAttacker();
 }
 
@@ -247,3 +273,4 @@ void ASFEnemy::OnRep_LastAttacker()
 		}
 	}
 }
+
