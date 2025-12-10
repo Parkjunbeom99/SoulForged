@@ -58,10 +58,6 @@ protected:
 	FGameplayTag LightningEventTag;	//실제 로직 수행 AnimNotify GameplayEvent 태그
 	//==================================================================
 
-	//=====================Gameplay 설정===============================
-	UPROPERTY(EditAnywhere, Category="SF|Gameplay")
-	float BaseDamage = 40.f; //기본 데미지
-
 	UPROPERTY(EditAnywhere, Category="SF|Gameplay")
 	float StrikeDistance = 300.f; //공격 소환 거리
 
