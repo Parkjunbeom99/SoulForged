@@ -3,17 +3,24 @@
 
 #include "SFStateReactionComponent.h"
 
+#include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayTagContainer.h"
 #include "AI/SFAIGameplayTags.h"
 #include "Character/SFCharacterGameplayTags.h"
 #include "Character/SFPawnExtensionComponent.h"
+#include "Character/Enemy/SFEnemy.h"
 #include "Character/Enemy/SFEnemyData.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 
 
+void USFStateReactionComponent::BeginPlay()
+{
+	Super::BeginPlay();
+	TryInitializeComponent();
+}
 
 void USFStateReactionComponent::Initialize(UAbilitySystemComponent* InASC)
 {
@@ -26,12 +33,23 @@ void USFStateReactionComponent::Initialize(UAbilitySystemComponent* InASC)
 	BindingTagsDelegate();
 }
 
+void USFStateReactionComponent::TryInitializeComponent()
+{
+	ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
+	if (IsValid(ASC))
+	{
+		Initialize(ASC);
+	}
+	else
+	{
+		GetWorld()->GetTimerManager().SetTimerForNextTick(this, &ThisClass::TryInitializeComponent);
+	}
+	
+}
+
 void USFStateReactionComponent::OnTagChanged(const FGameplayTag Tag, int32 NewCount)
 {
-	if (!GetOwner()->HasAuthority())
-	{
-		return;
-	}
+	
 	if (!IsValid(ASC))
 	{
 		return;
@@ -264,6 +282,11 @@ void USFStateReactionComponent::EndHitReact()
 void USFStateReactionComponent::StartDead()
 {
 	OnStateStart.Broadcast(SFGameplayTags::Character_State_Dead);
+
+	if (ASFEnemy* Enemy = Cast<ASFEnemy>(GetOwner()))
+	{
+		Enemy->TurnCollisionOff();
+	}
 	// 사망 처리 (되돌릴 수 없음)
 	// - 사망 애니메이션 (여러 종류)
 	// - 모든 입력/AI 완전 차단
@@ -286,6 +309,10 @@ void USFStateReactionComponent::StartDead()
 void USFStateReactionComponent::EndDead()
 {
 	OnStateEnd.Broadcast(SFGameplayTags::Character_State_Dead);
+	if (ASFEnemy* Enemy = Cast<ASFEnemy>(GetOwner()))
+	{
+		Enemy->TurnCollisionOn();
+	}
 	// 사망 상태는 보통 종료되지 않음
 	// 부활 시스템이 있다면 여기서 처리
 	// - 체력 일부 회복

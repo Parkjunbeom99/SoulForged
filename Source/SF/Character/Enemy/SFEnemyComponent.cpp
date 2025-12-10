@@ -111,7 +111,6 @@ void USFEnemyComponent::HandleChangeInitState(UGameFrameworkComponentManager* Ma
 		if (ASFEnemy* Enemy = GetPawn<ASFEnemy>())
 		{
 			Enemy->InitializeAbilitySystem();
-			Enemy->InitializeStateReactionComponent();
 			Enemy->InitializeMovementComponent();
 		}
 	}

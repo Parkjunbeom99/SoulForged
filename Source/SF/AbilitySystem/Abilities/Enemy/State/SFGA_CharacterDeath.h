@@ -4,18 +4,18 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/SFGameplayAbility.h"
-#include "SFGA_EnemyDeath.generated.h"
+#include "SFGA_CharacterDeath.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class SF_API USFGA_EnemyDeath : public USFGameplayAbility
+class SF_API USFGA_CharacterDeath : public USFGameplayAbility
 {
 	GENERATED_BODY()
 
 public:
-	USFGA_EnemyDeath();
+	USFGA_CharacterDeath();
 
 	
 	virtual void ActivateAbility( const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
@@ -24,7 +24,7 @@ protected:
 	
 	virtual void DeathEventAfterDelay();
 	
-	void DestroyEnemy();
+	virtual void DeathTimerEvent();
 	
 	FTimerHandle EventTimerHandle;
 	

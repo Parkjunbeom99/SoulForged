@@ -33,41 +33,18 @@ void USFPrimarySet::PostGameplayEffectExecute(const FGameplayEffectModCallbackDa
 	Super::PostGameplayEffectExecute(Data);
 
 	// 변경된 Attribute가 'Damage'인지 확인
+	// 라인 36-49
 	if (Data.EvaluatedData.Attribute == GetDamageAttribute())
 	{
-		// 1. 데미지 값(DamageDone)을 로컬 변수에 저장
 		const float DamageDone = GetDamage();
-		// 2. 임시 Attribute인 Damage를 다시 0으로 초기화
 		SetDamage(0.0f);
 
-		// 3.체력이 0보다 크고 유효한 데미지가 들어왔는지 확인
 		if (DamageDone > 0.0f && GetHealth() > 0.0f)
-		{
-			// 4. 'Damage'를 'Health'에 적용
+		{// 4. 'Damage'를 'Health'에 적용
 			SetHealth(GetHealth() - DamageDone);
 		}
 	}
-
-	// 변경된 Attribute가 'Health'인지 확인
-	if (Data.EvaluatedData.Attribute == GetHealthAttribute())
-	{
-		// 5. 체력이 0 이하가 되었는지 확인 (사망)
-		if (GetHealth() <= 0.0f)
-		{
-			if (USFAbilitySystemComponent* SFASC = GetSFAbilitySystemComponent())
-			{
-				// 6. 사망 태그가 없는 경우에만 부여 (중복방지)
-				if (!SFASC->HasMatchingGameplayTag(SFGameplayTags::Character_State_Dead))
-				{
-					SFASC->AddReplicatedLooseGameplayTag(SFGameplayTags::Character_State_Dead);
-
-					// TODO: 후에 GA_Death와 같은 사망 전용 어빌리티 활성화
-					 FGameplayEventData Payload;
-					 SFASC->HandleGameplayEvent(SFGameplayTags::GameplayEvent_Death, &Payload);
-				}
-			}
-		}
-	}
+	
 }
 
 void USFPrimarySet::PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const
@@ -94,7 +71,6 @@ void USFPrimarySet::PostAttributeChange(const FGameplayAttribute& Attribute, flo
 		{
 			USFAbilitySystemComponent* SFASC = GetSFAbilitySystemComponent();
 			check(SFASC);
-
 			SFASC->ApplyModToAttribute(GetHealthAttribute(), EGameplayModOp::Override, NewValue);
 		}
 	}
@@ -104,14 +80,16 @@ void USFPrimarySet::PostAttributeChange(const FGameplayAttribute& Attribute, flo
 		{
 			if (USFAbilitySystemComponent* SFASC = GetSFAbilitySystemComponent())
 			{
-				// 6. 사망 태그가 없는 경우에만 부여 (중복방지)
-				if (!SFASC->HasMatchingGameplayTag(SFGameplayTags::Character_State_Dead))
+				if (AActor* OwnerActor = GetOwningActor())
 				{
-					SFASC->AddLooseGameplayTag(SFGameplayTags::Character_State_Dead);
-
-					// TODO: 후에 GA_Death와 같은 사망 전용 어빌리티 활성화
-					FGameplayEventData Payload;
-					SFASC->HandleGameplayEvent(SFGameplayTags::GameplayEvent_Death, &Payload);
+					if (OwnerActor->HasAuthority())  
+					{
+						if (!SFASC->HasMatchingGameplayTag(SFGameplayTags::Character_State_Dead))
+						{    
+							FGameplayEventData Payload;
+							SFASC->HandleGameplayEvent(SFGameplayTags::GameplayEvent_Death, &Payload);
+						}
+					}
 				}
 			}
 		}
@@ -133,6 +111,8 @@ void USFPrimarySet::ClampAttribute(const FGameplayAttribute& Attribute, float& N
 void USFPrimarySet::OnRep_Health(const FGameplayAttributeData& OldValue)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, Health, OldValue);
+	
+	
 }
 
 void USFPrimarySet::OnRep_MaxHealth(const FGameplayAttributeData& OldValue)

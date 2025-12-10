@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Character/Enemy/SFEnemyData.h"
 #include "Components/ActorComponent.h"
+#include "Interface/EnemyActorComponent.h"
 #include "Templates/Function.h"
 #include "SFStateReactionComponent.generated.h"
 
@@ -26,7 +27,7 @@ struct FStateReaction
 
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
-class SF_API USFStateReactionComponent : public UActorComponent
+class SF_API USFStateReactionComponent : public UActorComponent, public IEnemyActorComponent
 {
 	GENERATED_BODY()
 
@@ -36,7 +37,9 @@ public:
 	
 	void Initialize(UAbilitySystemComponent* InASC);
 
+	virtual void  TryInitializeComponent() override;
 
+	virtual void BeginPlay() override;
 public:
 	// 상태 시작/종료 Delegate
 	UPROPERTY(BlueprintAssignable)

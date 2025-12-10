@@ -30,11 +30,10 @@ USFEnemyWidgetComponent::USFEnemyWidgetComponent()
 void USFEnemyWidgetComponent::BeginPlay()
 {
     Super::BeginPlay();
-
-    TryInitializeWidget();
+    TryInitializeComponent();
 }
 
-void USFEnemyWidgetComponent::TryInitializeWidget()
+void USFEnemyWidgetComponent::TryInitializeComponent()
 {
     UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
     if (IsValid(ASC))
@@ -43,9 +42,10 @@ void USFEnemyWidgetComponent::TryInitializeWidget()
     }
     else
     {
-        GetWorld()->GetTimerManager().SetTimerForNextTick(this, &ThisClass::TryInitializeWidget);
+        GetWorld()->GetTimerManager().SetTimerForNextTick(this, &ThisClass::TryInitializeComponent);
     }
 }
+
 void USFEnemyWidgetComponent::OnHealthChanged(const FOnAttributeChangeData& OnAttributeChangeData)
 {
     UpdateHealthPercent();
@@ -79,8 +79,7 @@ void USFEnemyWidgetComponent::InitializeWidget()
             CachedMaxHealth = PrimarySet->GetMaxHealth();
         }
     }
-
-    // 이 컴포넌트의 주인(몬스터)이 캐릭터인지 확인
+    
     ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
     if (OwnerCharacter && OwnerCharacter->GetCapsuleComponent())
     {

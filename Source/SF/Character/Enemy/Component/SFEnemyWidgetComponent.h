@@ -6,6 +6,7 @@
 #include "AbilitySystem/SFAbilitySystemComponent.h"
 #include "Character/Enemy/SFEnemy.h"
 #include "Components/WidgetComponent.h"
+#include "Interface/EnemyActorComponent.h"
 #include "UI/Controller/SFWidgetController.h"
 #include "SFEnemyWidgetComponent.generated.h"
 
@@ -18,7 +19,7 @@ class UCommonBarBase;
 
 
 UCLASS()
-class SF_API USFEnemyWidgetComponent : public UWidgetComponent
+class SF_API USFEnemyWidgetComponent : public UWidgetComponent, public IEnemyActorComponent
 {
 	GENERATED_BODY()
 
@@ -26,7 +27,8 @@ public:
 	USFEnemyWidgetComponent();
 
 	virtual void BeginPlay() override;
-	void TryInitializeWidget();
+
+	virtual void TryInitializeComponent() override;
 
 	void OnHealthChanged(const FOnAttributeChangeData& OnAttributeChangeData);
 	// 초기화

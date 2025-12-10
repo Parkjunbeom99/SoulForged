@@ -11,11 +11,13 @@
 #include "AbilitySystem/Attributes/Enemy/SFPrimarySet_Enemy.h"
 #include "AbilitySystem/GameplayEvent/SFGameplayEventTags.h"
 #include "AI/Controller/SFEnemyController.h"
+#include "Character/SFCharacterGameplayTags.h"
 #include "Character/SFPawnData.h"
 #include "Character/SFPawnExtensionComponent.h"
 #include "Component/SFEnemyMovementComponent.h"
 #include "Component/SFEnemyWidgetComponent.h"
 #include "Component/SFStateReactionComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "System/SFGameInstance.h"
 #include "Net/UnrealNetwork.h"
 
@@ -35,8 +37,6 @@ ASFEnemy::ASFEnemy(const FObjectInitializer& ObjectInitializer)
 	//AttributeSet
 	PrimarySet = CreateDefaultSubobject<USFPrimarySet_Enemy>(TEXT("PrimarySet"));
 	CombatSet = CreateDefaultSubobject<USFCombatSet_Enemy>(TEXT("CombatSet"));
-	
-
 
 	StateReactionComponent = ObjectInitializer.CreateDefaultSubobject<USFStateReactionComponent>(this, TEXT("StateReactionComponent"));
 	StateReactionComponent->SetIsReplicated(true);
@@ -155,13 +155,6 @@ void ASFEnemy::InitializeAttributeSet(USFPawnExtensionComponent* PawnExtComp)
 	}
 }
 
-void ASFEnemy::InitializeStateReactionComponent()
-{
-	if (IsValid(StateReactionComponent) && IsValid(AbilitySystemComponent))
-	{
-		StateReactionComponent->Initialize(AbilitySystemComponent);
-	}
-}
 
 void ASFEnemy::InitializeMovementComponent()
 {
@@ -274,3 +267,14 @@ void ASFEnemy::OnRep_LastAttacker()
 	}
 }
 
+void ASFEnemy::TurnCollisionOn()
+{
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	GetCapsuleComponent()->SetGenerateOverlapEvents(true);
+}
+
+void ASFEnemy::TurnCollisionOff()
+{
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetCapsuleComponent()->SetGenerateOverlapEvents(false);
+}

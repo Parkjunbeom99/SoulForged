@@ -182,9 +182,6 @@ void ASFEnemyController::OnPossess(APawn* InPawn)
 
     // 스폰 위치 저장
     SpawnLocation = InPawn->GetActorLocation();
-
-    // [수정] 통합 초기화 함수 호출로 변경 (기존 BindingStateMachine 대신 사용)
-    InitializeController();
 }
 
 void ASFEnemyController::OnUnPossess()
@@ -204,6 +201,11 @@ void ASFEnemyController::Tick(float DeltaTime)
 // [복구] 상태 이상(CC) 발생 시 BT 일시정지
 void ASFEnemyController::ReceiveStateStart(FGameplayTag StateTag)
 {
+
+    if (!HasAuthority())
+    {
+        return;
+    }
     if (StateTag == SFGameplayTags::Character_State_Stunned ||
         StateTag == SFGameplayTags::Character_State_Groggy ||
         StateTag == SFGameplayTags::Character_State_Parried||
@@ -234,6 +236,10 @@ void ASFEnemyController::ReceiveStateStart(FGameplayTag StateTag)
 void ASFEnemyController::ReceiveStateEnd(FGameplayTag StateTag)
 {
     // Death 상태는 재개하지 않음
+    if (!HasAuthority())
+    {
+        return;
+    }
     if (StateTag == SFGameplayTags::Character_State_Dead)
     {
         return;

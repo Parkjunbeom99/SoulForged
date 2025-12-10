@@ -34,13 +34,12 @@ public:
 	//Attrtibute 초기화
 	virtual void InitializeAttributeSet(USFPawnExtensionComponent* PawnExtComp);
 
-
-	//StateReaction Component 초기화
-	virtual void InitializeStateReactionComponent();
-
 	virtual void InitializeMovementComponent();
 
 	virtual FGenericTeamId GetGenericTeamId() const override;
+
+	void TurnCollisionOn();
+	void TurnCollisionOff();
 
 protected:
 
@@ -81,11 +80,13 @@ protected:
 	UPROPERTY(ReplicatedUsing=OnRep_LastAttacker)
 	TObjectPtr<AActor> LastAttacker;
 
-	UFUNCTION()
-	void OnRep_LastAttacker();
-
 public:
 	void SetLastAttacker(AActor* Attacker);
 
+
 	
+protected:
+	UFUNCTION()
+	void OnRep_LastAttacker();
+
 };

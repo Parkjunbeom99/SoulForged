@@ -80,6 +80,12 @@ void USFEnemyMovementComponent::MappingStateFunction()
 
 void USFEnemyMovementComponent::OnStateStart(FGameplayTag StateTag)
 {
+	
+	if (!GetOwner()->HasAuthority())
+	{
+		return;
+	}
+    
 	if (StateStartMap.Contains(StateTag))
 	{
 		StateStartMap[StateTag]();
@@ -88,6 +94,12 @@ void USFEnemyMovementComponent::OnStateStart(FGameplayTag StateTag)
 
 void USFEnemyMovementComponent::OnStateEnd(FGameplayTag StateTag)
 {
+	
+	if (!GetOwner()->HasAuthority())
+	{
+		return;
+	}
+    
 	if (StateEndMap.Contains(StateTag))
 	{
 		StateEndMap[StateTag]();
