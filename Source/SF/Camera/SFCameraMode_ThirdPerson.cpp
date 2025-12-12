@@ -1,6 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "SFCameraMode_ThirdPerson.h"
+
+#include "SFCameraComponent.h"
 #include "Camera/SFCameraMode.h"
 #include "Components/PrimitiveComponent.h"
 #include "Camera/SFPenetrationAvoidanceFeeler.h"
@@ -48,6 +50,11 @@ void USFCameraMode_ThirdPerson::OnActivation()
 
 	// 보간될 위치를 현재 위치로 즉시 설정(Snap)
 	SmoothedPivotLocation = IdealPivotLocation;
+
+	if (USFCameraComponent* CameraComp = GetSFCameraComponent())
+	{
+		AimLineToDesiredPosBlockedPct = CameraComp->GetSharedPenetrationBlockedPct();
+	}
 
 	Super::OnActivation();
 }
@@ -109,6 +116,11 @@ void USFCameraMode_ThirdPerson::UpdateView(float DeltaTime)
 
 	// 최종 희망 카메라 위치를 조정하여 벽 뚫림(관통) 방지
 	UpdatePreventPenetration(DeltaTime);
+
+	if (USFCameraComponent* CameraComp = GetSFCameraComponent())
+	{
+		CameraComp->SetSharedPenetrationBlockedPct(AimLineToDesiredPosBlockedPct);
+	}
 }
 
 // 타겟(캐릭터) 상태 추적

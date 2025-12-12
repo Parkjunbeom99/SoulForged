@@ -10,6 +10,7 @@
 #include "Character/SFCharacterBase.h"
 #include "MotionWarpingComponent.h"
 #include "AbilitySystem/GameplayEffect/Hero/EffectContext/SFTargetDataTypes.h"
+#include "Camera/SFCameraMode.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
 #include "Messages/SFMessageGameplayTags.h"
 #include "Messages/SFSkillInfoMessages.h"
@@ -78,7 +79,14 @@ void USFGA_Thrust_HeartBreaker::ActivateAbility(const FGameplayAbilitySpecHandle
 	StartChargingCue();
 	StartPhaseTimer();
 
-	SetCameraMode(CameraModeClass);
+	if (PhaseCameraModes.Num() > 0)
+	{
+		UpdateCameraModeForPhase(0);
+	}
+	else
+	{
+		SetCameraMode(CameraModeClass);
+	}
 
 	// 서버인 경우 클라이언트로부터 TargetData(차지 페이즈, 위치) 수신 대기
 	if (ActorInfo->IsNetAuthority())
@@ -141,6 +149,9 @@ void USFGA_Thrust_HeartBreaker::OnPhaseTimePassed()
 	}
 
 	UpdateChargingCuePhase();
+
+	UpdateCameraModeForPhase(CurrentPhaseIndex);
+	
 	StartPhaseTimer();
 }
 
@@ -271,6 +282,8 @@ void USFGA_Thrust_HeartBreaker::ExecuteRushAttack()
 			RushMontageTask->ReadyForActivation();
 		}
 	}
+
+	ClearCameraMode();
 }
 
 int32 USFGA_Thrust_HeartBreaker::CalculatePhase(float TimeHeld) const
@@ -466,6 +479,14 @@ void USFGA_Thrust_HeartBreaker::StopChargingCue()
 
 	// Looping Cue 종료 (OnRemove 호출)
 	ASC->RemoveGameplayCue(ChargingCueTag);
+}
+
+void USFGA_Thrust_HeartBreaker::UpdateCameraModeForPhase(int32 PhaseIndex)
+{
+	if (PhaseCameraModes.IsValidIndex(PhaseIndex) && PhaseCameraModes[PhaseIndex])
+	{
+		SetCameraMode(PhaseCameraModes[PhaseIndex]);
+	}
 }
 
 float USFGA_Thrust_HeartBreaker::GetPhaseDamage() const
