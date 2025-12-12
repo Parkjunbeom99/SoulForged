@@ -8,11 +8,13 @@
 #include "MotionWarpingComponent.h"
 #include "AbilitySystem/Abilities/SFGameplayAbilityTags.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "AbilitySystem/SFAbilitySystemComponent.h"
+#include "AbilitySystem/GameplayEffect/Hero/EffectContext/SFTargetDataTypes.h"
 
 USFGA_Dodge::USFGA_Dodge(FObjectInitializer const& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	AbilityTags.AddTag(SFGameplayTags::Ability_Hero_Dodge);
+	SetAssetTags(FGameplayTagContainer(SFGameplayTags::Ability_Hero_Dodge));
 }
 
 void USFGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
@@ -40,18 +42,89 @@ void USFGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		return;
 	}
 
-	// 3. 구를 방향 및 위치 계산
-	FVector TargetLocation;
-	FRotator TargetRotation;
-	CalculateDodgeParameters(TargetLocation, TargetRotation);
+	// =================================================================
+	// 클라이언트와 서버의 로직 분기
+	// =================================================================
 
-	// 4. Motion Warping 타겟 설정
+	if (IsLocallyControlled())
+	{
+		// --- [Local Client / Host] ---
+		
+		// 1. 방향 및 위치 계산
+		FVector TargetLocation;
+		FRotator TargetRotation;
+		CalculateDodgeParameters(TargetLocation, TargetRotation);
+
+		// 2. 서버로 보낼 데이터 패키징
+		FScopedPredictionWindow ScopedPrediction(GetAbilitySystemComponentFromActorInfo());
+		
+		FSFGameplayAbilityTargetData_ChargePhase* NewData = new FSFGameplayAbilityTargetData_ChargePhase();
+		NewData->RushTargetLocation = TargetLocation; // 위치 저장
+		NewData->RushTargetRotation = TargetRotation; // 회전 저장
+		NewData->PhaseIndex = 0; // 구르기는 페이즈 없으므로 0
+
+		FGameplayAbilityTargetDataHandle DataHandle(NewData);
+
+		// 3. 서버로 전송
+		GetAbilitySystemComponentFromActorInfo()->ServerSetReplicatedTargetData(
+				GetCurrentAbilitySpecHandle(), 
+				GetCurrentActivationInfo().GetActivationPredictionKey(), 
+				DataHandle, 
+				FGameplayTag(), 
+				GetAbilitySystemComponentFromActorInfo()->ScopedPredictionKey);
+
+		// 4. 로컬(내 화면)에서 즉시 실행 (예측)
+		ApplyDodge(TargetLocation, TargetRotation);
+	}
+	else if (ActorInfo->IsNetAuthority())
+	{
+		// --- [Dedicated Server / Remote Server] ---
+
+		// 1. 클라이언트가 보낸 데이터 수신 대기
+		USFAbilitySystemComponent* ASC = GetSFAbilitySystemComponentFromActorInfo();
+		if (ASC)
+		{
+			FAbilityTargetDataSetDelegate& TargetDataDelegate = ASC->AbilityTargetDataSetDelegate(
+				CurrentSpecHandle, 
+				CurrentActivationInfo.GetActivationPredictionKey()
+			);
+
+			// 데이터가 오면 OnServerTargetDataReceived 함수 실행
+			ServerTargetDataDelegateHandle = TargetDataDelegate.AddUObject(this, &ThisClass::OnServerTargetDataReceived);
+
+			// 혹시 Activate보다 데이터가 먼저 도착했는지 확인
+			ASC->CallReplicatedTargetDataDelegatesIfSet(CurrentSpecHandle, CurrentActivationInfo.GetActivationPredictionKey());
+		}
+	}
+}
+
+void USFGA_Dodge::OnServerTargetDataReceived(const FGameplayAbilityTargetDataHandle& DataHandle, FGameplayTag ActivationTag)
+{
+	// 데이터 사용 처리 (메모리 해제 등)
+	GetAbilitySystemComponentFromActorInfo()->ConsumeClientReplicatedTargetData(CurrentSpecHandle, CurrentActivationInfo.GetActivationPredictionKey());
+
+	// 데이터 꺼내기
+	const FSFGameplayAbilityTargetData_ChargePhase* ReceivedData = static_cast<const FSFGameplayAbilityTargetData_ChargePhase*>(DataHandle.Get(0));
+	
+	if (ReceivedData)
+	{
+		// 서버는 계산하지 않고, 클라이언트가 준 위치대로 이동
+		ApplyDodge(ReceivedData->RushTargetLocation, ReceivedData->RushTargetRotation);
+	}
+}
+
+void USFGA_Dodge::ApplyDodge(const FVector& TargetLocation, const FRotator& TargetRotation)
+{
+	ASFCharacterBase* Character = GetSFCharacterFromActorInfo();
+	if (!Character) return;
+
+	// 1. Motion Warping 설정
 	SetupMotionWarping(TargetLocation, TargetRotation);
 
-	// 5. 캐릭터 회전 (구르는 방향을 바라보게 함)
+	// 2. 캐릭터 회전 강제 설정
 	Character->SetActorRotation(TargetRotation);
 
-	// 6. 몽타주 재생
+	// 3. 몽타주 재생
 	if (DodgeMontage)
 	{
 		UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
@@ -72,11 +145,10 @@ void USFGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 			MontageTask->ReadyForActivation();
 		}
 	}
-    else
-    {
-        // 몽타주가 없으면 즉시 종료
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
-    }
+	else
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+	}
 }
 
 void USFGA_Dodge::CalculateDodgeParameters(FVector& OutLocation, FRotator& OutRotation) const
@@ -84,12 +156,10 @@ void USFGA_Dodge::CalculateDodgeParameters(FVector& OutLocation, FRotator& OutRo
 	ASFCharacterBase* Character = GetSFCharacterFromActorInfo();
 	if (!Character) return;
 
-	// 플레이어의 입력 방향 가져오기 (WASD)
+	// 플레이어의 입력 방향 가져오기
 	FVector InputDir = Character->GetLastMovementInputVector();
 
-	// 입력이 없으면 캐릭터의 반대 방향(백스탭) 혹은 전방(그냥 구르기) 설정
-	// 소울류: 입력 없으면 '백스텝'이 국룰이지만, 취향에 따라 전방으로 해도 됨.
-    // 여기서는 '입력 없으면 백스텝(-Forward)'으로 구현
+	// 입력 없으면 백스텝
 	if (InputDir.IsNearlyZero())
 	{
 		InputDir = -Character->GetActorForwardVector();
@@ -101,18 +171,15 @@ void USFGA_Dodge::CalculateDodgeParameters(FVector& OutLocation, FRotator& OutRo
 
 	OutRotation = InputDir.Rotation();
 
-	// 목표 위치 계산 (현재 위치 + 방향 * 거리)
 	FVector StartParams = Character->GetActorLocation();
 	FVector EndParams = StartParams + (InputDir * DodgeDistance);
 
-	// **벽 뚫기 방지 (LineTrace)**
+	// 벽 뚫기 방지
 	FHitResult HitResult;
-    // 채널은 프로젝트 설정에 맞게 변경 (예: ECC_WorldStatic)
 	GetWorld()->LineTraceSingleByChannel(HitResult, StartParams, EndParams, ECC_Visibility);
 
 	if (HitResult.bBlockingHit)
 	{
-		// 벽에 닿았으면, 벽보다 살짝 앞(30유닛)까지만 이동
 		OutLocation = HitResult.Location - (InputDir * 30.f);
 	}
 	else
@@ -128,7 +195,6 @@ void USFGA_Dodge::SetupMotionWarping(const FVector& TargetLocation, const FRotat
 	{
 		if (UMotionWarpingComponent* MW = Character->GetMotionWarpingComponent())
 		{
-			// 위치와 회전을 모두 타겟팅
 			MW->AddOrUpdateWarpTargetFromLocationAndRotation(WarpTargetName, TargetLocation, TargetRotation);
 		}
 	}
@@ -141,6 +207,21 @@ void USFGA_Dodge::OnMontageFinished()
 
 void USFGA_Dodge::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+	// 서버 델리게이트 정리
+	if (ActorInfo->IsNetAuthority() && ServerTargetDataDelegateHandle.IsValid())
+	{
+		USFAbilitySystemComponent* ASC = GetSFAbilitySystemComponentFromActorInfo();
+		if (ASC)
+		{
+			FAbilityTargetDataSetDelegate& TargetDataDelegate = ASC->AbilityTargetDataSetDelegate(
+				CurrentSpecHandle, 
+				CurrentActivationInfo.GetActivationPredictionKey()
+			);
+			TargetDataDelegate.Remove(ServerTargetDataDelegateHandle);
+		}
+		ServerTargetDataDelegateHandle.Reset();
+	}
+
 	// Motion Warping 타겟 정리
 	if (ASFCharacterBase* Character = GetSFCharacterFromActorInfo())
 	{

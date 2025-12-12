@@ -7,7 +7,7 @@
 #include "USFGA_Dodge.generated.h"
 
 /**
- * 
+ * 소울류 구르기 (클라이언트 예측 + 서버 동기화 버전)
  */
 UCLASS()
 class SF_API USFGA_Dodge : public USFGameplayAbility
@@ -25,8 +25,16 @@ protected:
 	UFUNCTION()
 	void OnMontageFinished();
 
-	// 구르기 계산 로직
+	// [계산] 구를 방향과 위치를 계산만 하는 함수
 	void CalculateDodgeParameters(FVector& OutLocation, FRotator& OutRotation) const;
+
+	// [실행] 계산된 위치로 실제 구르기(MotionWarping + Montage)를 실행하는 함수
+	void ApplyDodge(const FVector& TargetLocation, const FRotator& TargetRotation);
+
+	// [서버] 클라이언트로부터 위치 데이터를 받았을 때 실행
+	void OnServerTargetDataReceived(const FGameplayAbilityTargetDataHandle& DataHandle, FGameplayTag ActivationTag);
+	
+	// Motion Warping 컴포넌트 업데이트 헬퍼
 	void SetupMotionWarping(const FVector& TargetLocation, const FRotator& TargetRotation);
 
 protected:
@@ -41,4 +49,8 @@ protected:
 	// Motion Warping 타겟 이름 (몽타주 노티파이와 일치해야 함)
 	UPROPERTY(EditDefaultsOnly, Category = "SF|MotionWarping")
 	FName WarpTargetName = TEXT("Dodge");
+
+private:
+	// 서버에서 데이터를 기다릴 때 쓰는 핸들
+	FDelegateHandle ServerTargetDataDelegateHandle;
 };
