@@ -23,38 +23,38 @@ void USFEnemyMovementComponent::InitializeMovementComponent()
 
 void USFEnemyMovementComponent::InternalDisableMovement()
 {
-	ACharacter* OwnerChar = Cast<ACharacter>(GetOwner());
-	if (!OwnerChar) return;
-
-	UCharacterMovementComponent* MoveComp = OwnerChar->GetCharacterMovement();
-	if (!MoveComp) return;
-
-	// 안전한 디세이블 방식
-	PreviousMovementMode = MoveComp->MovementMode;
-
-	MoveComp->StopMovementImmediately();
-
-	MoveComp->SetMovementMode(MOVE_None);
+	// ACharacter* OwnerChar = Cast<ACharacter>(GetOwner());
+	// if (!OwnerChar) return;
+	//
+	// UCharacterMovementComponent* MoveComp = OwnerChar->GetCharacterMovement();
+	// if (!MoveComp) return;
+	//
+	// // 안전한 디세이블 방식
+	// PreviousMovementMode = MoveComp->MovementMode;
+	//
+	// MoveComp->StopMovementImmediately();
+	//
+	// MoveComp->SetMovementMode(MOVE_None);
 }
 
 void USFEnemyMovementComponent::InternalEnableMovement()
 {
-	ACharacter* OwnerChar = Cast<ACharacter>(GetOwner());
-	if (!OwnerChar) return;
-
-	UCharacterMovementComponent* MoveComp = OwnerChar->GetCharacterMovement();
-	if (!MoveComp) return;
-
-	// 이전 모드가 정상이라면 복구
-	if (PreviousMovementMode != MOVE_None)
-	{
-		MoveComp->SetMovementMode(PreviousMovementMode);
-	}
-	else
-	{
-		// 기본값 WALK
-		MoveComp->SetMovementMode(MOVE_Walking);
-	}
+	// ACharacter* OwnerChar = Cast<ACharacter>(GetOwner());
+	// if (!OwnerChar) return;
+	//
+	// UCharacterMovementComponent* MoveComp = OwnerChar->GetCharacterMovement();
+	// if (!MoveComp) return;
+	//
+	// // 이전 모드가 정상이라면 복구
+	// if (PreviousMovementMode != MOVE_None)
+	// {
+	// 	MoveComp->SetMovementMode(PreviousMovementMode);
+	// }
+	// else
+	// {
+	// 	// 기본값 WALK
+	// 	MoveComp->SetMovementMode(MOVE_Walking);
+	// }
 }
 
 void USFEnemyMovementComponent::MappingStateFunction()
