@@ -219,22 +219,22 @@ void USFGA_Skill_Melee::StartWindupWarpTask()
 	{
 		if (WarpTargetTask)
 		{
-			WarpTargetTask->OnWarpTargetCommitted.AddDynamic(this, &ThisClass::OnWarpTargetCommitted);
+			//WarpTargetTask->OnWarpTargetCommitted.AddDynamic(this, &ThisClass::OnWarpTargetCommitted);
 			WarpTargetTask->ReadyForActivation();
 		}
 	}
 
 	// Host Player는 수신 대기 안 함
-	if (HasAuthority(&CurrentActivationInfo) && !IsLocallyControlled())
-	{
-		USFAbilitySystemComponent* ASC = GetSFAbilitySystemComponentFromActorInfo();
-		if (ASC)
-		{
-			FAbilityTargetDataSetDelegate& TargetDataDelegate = ASC->AbilityTargetDataSetDelegate(CurrentSpecHandle, CurrentActivationInfo.GetActivationPredictionKey());
-			ServerWarpDataDelegateHandle = TargetDataDelegate.AddUObject(this, &ThisClass::OnServerWarpDirectionReceived);
-			ASC->CallReplicatedTargetDataDelegatesIfSet(CurrentSpecHandle, CurrentActivationInfo.GetActivationPredictionKey());
-		}
-	}
+	// if (HasAuthority(&CurrentActivationInfo) && !IsLocallyControlled())
+	// {
+	// 	USFAbilitySystemComponent* ASC = GetSFAbilitySystemComponentFromActorInfo();
+	// 	if (ASC)
+	// 	{
+	// 		FAbilityTargetDataSetDelegate& TargetDataDelegate = ASC->AbilityTargetDataSetDelegate(CurrentSpecHandle, CurrentActivationInfo.GetActivationPredictionKey());
+	// 		ServerWarpDataDelegateHandle = TargetDataDelegate.AddUObject(this, &ThisClass::OnServerWarpDirectionReceived);
+	// 		ASC->CallReplicatedTargetDataDelegatesIfSet(CurrentSpecHandle, CurrentActivationInfo.GetActivationPredictionKey());
+	// 	}
+	// }
 }
 
 void USFGA_Skill_Melee::CleanupWindupWarpTask()

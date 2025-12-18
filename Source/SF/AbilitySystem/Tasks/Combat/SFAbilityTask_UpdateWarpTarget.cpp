@@ -3,6 +3,7 @@
 #include "AbilitySystemComponent.h"
 #include "SFLogChannels.h"
 #include "Character/SFCharacterBase.h"
+#include "Character/Hero/Component/SFHeroMovementComponent.h"
 #include "Combat/SFCombatTags.h"
 
 USFAbilityTask_UpdateWarpTarget::USFAbilityTask_UpdateWarpTarget(const FObjectInitializer& ObjectInitializer)
@@ -116,6 +117,20 @@ void USFAbilityTask_UpdateWarpTarget::TickTask(float DeltaTime)
 	}
 }
 
+void USFAbilityTask_UpdateWarpTarget::OnDestroy(bool AbilityEndedOrCancelled)
+{
+	// CMC의 Warp 타겟 해제
+	if (OwnerCharacter.IsValid())
+	{
+		if (USFHeroMovementComponent* SFMovement = Cast<USFHeroMovementComponent>(OwnerCharacter->GetCharacterMovement()))
+		{
+			SFMovement->ClearWarpTarget();
+		}
+	}
+	
+	Super::OnDestroy(AbilityEndedOrCancelled);
+}
+
 void USFAbilityTask_UpdateWarpTarget::ResetInitialDirection()
 {
 	if (OwnerCharacter.IsValid())
@@ -157,6 +172,12 @@ void USFAbilityTask_UpdateWarpTarget::UpdateWarpTargetFromInput(float DeltaTime)
 	CurrentWarpLocation = NewLocation;
 
 	ApplyWarpTarget(NewLocation, NewDirection.Rotation());
+
+	// CMC에도 타겟 전달 (네트워크 동기화용)
+	if (USFHeroMovementComponent* SFMovement = Cast<USFHeroMovementComponent>(OwnerCharacter->GetCharacterMovement()))
+	{
+		SFMovement->SetWarpTarget(NewLocation, NewDirection.Rotation());
+	}
 }
 
 void USFAbilityTask_UpdateWarpTarget::UpdateWarpTargetFromLockedTarget(float DeltaTime)

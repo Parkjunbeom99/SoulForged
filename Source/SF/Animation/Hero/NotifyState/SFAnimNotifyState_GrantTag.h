@@ -17,6 +17,9 @@ class SF_API USFAnimNotifyState_GrantTag : public UAnimNotifyState
 	GENERATED_BODY()
 
 public:
+
+	USFAnimNotifyState_GrantTag(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+	
 	// 에디터에서 설정 가능: 이 노티파이 구간 동안 캐릭터에게 부여할 태그
 	// 반드시 'EditAnywhere'여야 몽타주 디테일 패널에서 설정 가능
 	UPROPERTY(EditAnywhere, Category = "Gameplay Tags")
