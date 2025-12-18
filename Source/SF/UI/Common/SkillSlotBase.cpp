@@ -332,6 +332,8 @@ bool USkillSlotBase::GetCurrentSkillActiveDuration(UAbilitySystemComponent* ASC,
                 }
             }
         }
+
+    	return false;
     }
 
     // 2. 일반 스킬 로직 (쿨타임 제외 필터링 포함)
