@@ -34,6 +34,20 @@ public:
 
 	USFHeroMovementComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
+	virtual float GetMaxSpeed() const override;
+
+protected:
+	UPROPERTY(EditDefaultsOnly, Category = "SF|Movement")
+	float LeftRightMovePercent = 0.7f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "SF|Movement")
+	float BackwardMovePercent = 0.6f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "SF|Movement")
+	float CrouchMovePercent = 0.5f;
+
+public:
+
 	// Warp 타겟 설정 (AbilityTask에서 호출) 
 	UFUNCTION(BlueprintCallable, Category = "SF|Movement|Warp")
 	void SetWarpTarget(const FVector& Location, const FRotator& Rotation);

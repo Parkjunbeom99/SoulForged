@@ -47,11 +47,16 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "SF|AbilityTask")
 	FVector GetCurrentWarpLocation() const { return CurrentWarpLocation; }
+
+	void SetRange(float NewRange) { Range = NewRange; }
+	void SetInterpSpeed(float NewInterpSpeed) { InterpSpeed = NewInterpSpeed; }
 	
 protected:
 	virtual void Activate() override;
 	virtual void TickTask(float DeltaTime) override;
 	virtual void OnDestroy(bool AbilityEndedOrCancelled) override;
+
+	void ApplyWarpTargetWithSync(const FVector& Location, const FRotator& Rotation);
 
 private:
 

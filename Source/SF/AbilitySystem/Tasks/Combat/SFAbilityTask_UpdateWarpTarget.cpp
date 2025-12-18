@@ -63,7 +63,7 @@ void USFAbilityTask_UpdateWarpTarget::Activate()
 	CurrentWarpDirection = InitialForwardDirection;
 	CurrentWarpLocation = OwnerCharacter->GetActorLocation() + (CurrentWarpDirection * Range);
 
-	ApplyWarpTarget(CurrentWarpLocation, CurrentWarpDirection.Rotation());
+	ApplyWarpTargetWithSync(CurrentWarpLocation, CurrentWarpDirection.Rotation());
 
 	bIsPaused = !IsInWindupPhase();
 }
@@ -139,7 +139,7 @@ void USFAbilityTask_UpdateWarpTarget::ResetInitialDirection()
 		CurrentWarpDirection = InitialForwardDirection;
 		CurrentWarpLocation = OwnerCharacter->GetActorLocation() + (CurrentWarpDirection * Range);
 
-		ApplyWarpTarget(CurrentWarpLocation, CurrentWarpDirection.Rotation());
+		ApplyWarpTargetWithSync(CurrentWarpLocation, CurrentWarpDirection.Rotation());
 	}
 }
 
@@ -171,13 +171,7 @@ void USFAbilityTask_UpdateWarpTarget::UpdateWarpTargetFromInput(float DeltaTime)
 	CurrentWarpDirection = NewDirection;
 	CurrentWarpLocation = NewLocation;
 
-	ApplyWarpTarget(NewLocation, NewDirection.Rotation());
-
-	// CMC에도 타겟 전달 (네트워크 동기화용)
-	if (USFHeroMovementComponent* SFMovement = Cast<USFHeroMovementComponent>(OwnerCharacter->GetCharacterMovement()))
-	{
-		SFMovement->SetWarpTarget(NewLocation, NewDirection.Rotation());
-	}
+	ApplyWarpTargetWithSync(CurrentWarpLocation, CurrentWarpDirection.Rotation());
 }
 
 void USFAbilityTask_UpdateWarpTarget::UpdateWarpTargetFromLockedTarget(float DeltaTime)
@@ -219,7 +213,7 @@ void USFAbilityTask_UpdateWarpTarget::UpdateWarpTargetFromLockedTarget(float Del
 	CurrentWarpDirection = NewDirection;
 	CurrentWarpLocation = NewLocation;
 
-	ApplyWarpTarget(NewLocation, NewDirection.Rotation());
+	ApplyWarpTargetWithSync(NewLocation, NewDirection.Rotation());
 }
 
 FVector USFAbilityTask_UpdateWarpTarget::ClampDirectionToMaxAngle(const FVector& DesiredDirection) const
@@ -260,6 +254,21 @@ FVector USFAbilityTask_UpdateWarpTarget::InterpolateDirection(const FVector& Cur
 	FRotator NewRotation = FMath::RInterpTo(CurrentRotation, TargetRotation, DeltaTime, InterpSpeed);
 
 	return NewRotation.Vector();
+}
+
+void USFAbilityTask_UpdateWarpTarget::ApplyWarpTargetWithSync(const FVector& Location, const FRotator& Rotation)
+{
+	// MotionWarpingComponent에 적용
+	ApplyWarpTarget(Location, Rotation);
+
+	// CMC에 적용 (네트워크 동기화용)
+	if (OwnerCharacter.IsValid())
+	{
+		if (USFHeroMovementComponent* SFMovement = Cast<USFHeroMovementComponent>(OwnerCharacter->GetCharacterMovement()))
+		{
+			SFMovement->SetWarpTarget(Location, Rotation);
+		}
+	}
 }
 
 void USFAbilityTask_UpdateWarpTarget::ApplyWarpTarget(const FVector& Location, const FRotator& Rotation)

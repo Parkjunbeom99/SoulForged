@@ -1,6 +1,9 @@
 #include "SFHeroMovementComponent.h"
 
+#include "AbilitySystemComponent.h"
+#include "AbilitySystemGlobals.h"
 #include "MotionWarpingComponent.h"
+#include "AbilitySystem/Attributes/Hero/SFPrimarySet_Hero.h"
 #include "GameFramework/Character.h"
 
 void USFHeroMovementComponent::BeginPlay()
@@ -21,6 +24,57 @@ USFHeroMovementComponent::USFHeroMovementComponent(const FObjectInitializer& Obj
 	bHasActiveWarpTarget = false;
 
 	SetNetworkMoveDataContainer(SFNetworkMoveDataContainer);
+}
+
+float USFHeroMovementComponent::GetMaxSpeed() const
+{
+	if (UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(GetOwner()))
+	{
+		const UAttributeSet* AttributeSet = ASC->GetAttributeSet(USFPrimarySet_Hero::StaticClass());
+		if (const USFPrimarySet_Hero* PrimarySet = Cast<USFPrimarySet_Hero>(AttributeSet))
+		{
+			float MoveSpeed = PrimarySet->GetMoveSpeed();
+			float MoveSpeedPercent = PrimarySet->GetMoveSpeedPercent();
+
+			// 기본 속도 + 퍼센트 보너스
+			float MaxMoveSpeed = FMath::Max(0.f, MoveSpeed + MoveSpeed * (MoveSpeedPercent / 100.f));
+			switch(MovementMode)
+			{
+			case MOVE_Walking:
+			case MOVE_NavWalking:
+			{
+				float DirectionDot = GetOwner()->GetActorForwardVector().Dot(Velocity.GetSafeNormal());
+				if (DirectionDot < 0.25f)
+				{
+					if (DirectionDot > -0.25f)
+					{
+						MaxMoveSpeed = MaxMoveSpeed * LeftRightMovePercent;
+					}
+					else
+					{
+						MaxMoveSpeed = MaxMoveSpeed * BackwardMovePercent;
+					}
+				}
+
+				MaxMoveSpeed = IsCrouching() ? CrouchMovePercent * MaxMoveSpeed : MaxMoveSpeed;	
+				GEngine->AddOnScreenDebugMessage(1, 0.1f, FColor::Red, FString::Printf(TEXT("MaxSpeed: %f"), MaxMoveSpeed));
+				return MaxMoveSpeed;
+			}
+			case MOVE_Falling:
+				return MaxMoveSpeed;
+			case MOVE_Swimming:
+				return MaxSwimSpeed;
+			case MOVE_Flying:
+				return MaxFlySpeed;
+			case MOVE_Custom:
+				return MaxCustomMovementSpeed;
+			case MOVE_None:
+			default:
+				return 0.f;
+			}
+		}
+	}
+	return Super::GetMaxSpeed();
 }
 
 void USFHeroMovementComponent::SetWarpTarget(const FVector& Location, const FRotator& Rotation)

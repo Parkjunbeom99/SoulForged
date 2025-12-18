@@ -215,13 +215,10 @@ void USFGA_Skill_Melee::StartWindupWarpTask()
 	WarpTargetTask = USFAbilityTask_UpdateWarpTarget::CreateTask(this, TargetName, Range, InterpSpeed, MaxAngle);
 
 	// 로컬에서만 Task 실행
-	if (IsLocallyControlled())
+	if (IsLocallyControlled() && WarpTargetTask)
 	{
-		if (WarpTargetTask)
-		{
-			//WarpTargetTask->OnWarpTargetCommitted.AddDynamic(this, &ThisClass::OnWarpTargetCommitted);
-			WarpTargetTask->ReadyForActivation();
-		}
+		//WarpTargetTask->OnWarpTargetCommitted.AddDynamic(this, &ThisClass::OnWarpTargetCommitted);
+		WarpTargetTask->ReadyForActivation();
 	}
 
 	// Host Player는 수신 대기 안 함

@@ -116,10 +116,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "SF|Warp", meta = (EditCondition = "bUseWindupWarp && !bUseEquipmentWarpSettings"))
 	float MaxWindupTurnAngleOverride = 90.f;
 
-private:
 	UPROPERTY()
 	TObjectPtr<USFAbilityTask_UpdateWarpTarget> WarpTargetTask;
 
+private:
+	
 	// 확정된 방향/위치 (네트워크 동기화용)
 	FVector CommittedDirection = FVector::ForwardVector;
 	FVector CommittedLocation = FVector::ZeroVector;
