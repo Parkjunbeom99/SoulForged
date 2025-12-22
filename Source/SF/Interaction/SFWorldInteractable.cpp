@@ -108,4 +108,18 @@ void ASFWorldInteractable::OnRep_WasConsumed()
 	UE_LOG(LogSF, Warning, TEXT("bWasConsumed changed: %d"), bWasConsumed);
 }
 
+int32 ASFWorldInteractable::GetActiveInteractorCount() const
+{
+	int32 Count = 0;
+	for (const TWeakObjectPtr<AActor>& Interactor : CachedInteractors)
+	{
+		if (Interactor.IsValid())
+		{
+			++Count;
+		}
+	}
+	return Count;
+}
+
+
 

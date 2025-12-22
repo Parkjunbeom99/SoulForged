@@ -12,6 +12,7 @@
 #include "Character/SFPawnData.h"
 #include "Character/SFPawnExtensionComponent.h"
 #include "Character/Hero/SFHeroDefinition.h"
+#include "Components/SFPlayerCombatStateComponent.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
 #include "Messages/SFMessageGameplayTags.h"
 #include "Messages/SFPortalInfoMessages.h"
@@ -28,9 +29,11 @@ ASFPlayerState::ASFPlayerState(const FObjectInitializer& ObjectInitializer)
 	PrimarySet = CreateDefaultSubobject<USFPrimarySet_Hero>(TEXT("PrimarySet"));
 	CombatSet = CreateDefaultSubobject<USFCombatSet_Hero>(TEXT("CombatSet"));
 
-	//Upgrade
-	PermanentUpgradeComponent =
-		CreateDefaultSubobject<USFPermanentUpgradeComponent>(TEXT("PermanentUpgradeComponent"));
+	// Upgrade
+	PermanentUpgradeComponent = CreateDefaultSubobject<USFPermanentUpgradeComponent>(TEXT("PermanentUpgradeComponent"));
+
+	// CombatState
+	CombatStateComponent = CreateDefaultSubobject<USFPlayerCombatStateComponent>(TEXT("CombatStateComponent"));
 	
 	SetNetUpdateFrequency(100.f);
 }

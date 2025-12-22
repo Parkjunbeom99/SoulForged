@@ -79,14 +79,15 @@ public:
 
 	/**
 	* 하이라이트 효과를 위한 메시 컴포넌트들을 반환하는 가상 함수
-	* 상호작용 가능한 객체가 플레이어 시선에 들어올 때 아웃라인 효과를 적용하기 위해 사용
 	*/
 	UFUNCTION(BlueprintCallable)
 	virtual void GetMeshComponents(TArray<UMeshComponent*>& OutMeshComponents) const { }
 
-	/**
-	* 현재 상황에서 상호작용이 가능한지 검증하는 가상 함수
-	*/
 	UFUNCTION(BlueprintCallable)
 	virtual bool CanInteraction(const FSFInteractionQuery& InteractionQuery) const { return true; }
+
+	virtual void OnInteractActiveStarted(AActor* Interactor) {}
+	virtual void OnInteractActiveEnded(AActor* Interactor) {}
+	virtual void OnInteractionSuccess(AActor* Interactor) {}
+	virtual int32 GetActiveInteractorCount() const { return 0; }
 };

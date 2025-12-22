@@ -13,6 +13,11 @@ void USFGA_Interact_Chest::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
+	if (!bInitialized)
+	{
+		return;
+	}
+
 	if (TriggerEventData == nullptr || bInitialized == false)
 	{
 		CancelAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true);

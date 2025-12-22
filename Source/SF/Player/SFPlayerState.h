@@ -18,6 +18,7 @@ struct FStreamableHandle;
 class ASFPlayerController;
 class USFPawnData;
 class USFAbilitySystemComponent;
+class USFPlayerCombatStateComponent;
 
 // PawnData 로드 완료 델리게이트
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnPawnDataLoaded, const USFPawnData*);
@@ -192,6 +193,13 @@ private:
 	bool bHasLastAppliedPermanentUpgradeData = false;
 	FSFPermanentUpgradeData LastAppliedPermanentUpgradeData;
 	//===========================
+
+	//=====Combat State=====
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<USFPlayerCombatStateComponent> CombatStateComponent;
+	
+
+	//======================
 
 protected:
 	// Permanent Upgrade

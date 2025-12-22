@@ -32,6 +32,14 @@ private:
 	UFUNCTION()
 	void OnInvalidInteraction();
 
+	void StartHoldingInteraction();
+
+	/** ISFInteractable에 홀딩 시작 알림 */
+	void NotifyInteractableActiveStarted();
+
+	/** ISFInteractable에 홀딩 종료 알림 */
+	void NotifyInteractableActiveEnded();
+
 	// 상호작용 입력이 해제되었을 때 호출되는 콜백
 	UFUNCTION()
 	void OnInputReleased(float TimeHeld);
@@ -46,6 +54,13 @@ private:
 	// 실제 상호작용을 트리거하는 함수(홀딩 완료 후 상호작용 대상의 어빌리티를 활성화)
 	UFUNCTION()
 	bool TriggerInteraction();
+
+	// GaugeBased 완료 이벤트 대기 
+	void WaitForGaugeBasedComplete();
+
+	// GaugeBased 완료 이벤트 수신 시 호출 
+	UFUNCTION()
+	void OnGaugeBasedCompleted(FGameplayEventData Payload);
 
 	// 캐릭터의 HeroAnimationData에서 상호작용 시작 몽타주 조회
 	FSFMontagePlayData GetInteractionStartMontage() const;
@@ -63,4 +78,8 @@ protected:
 	// 상호작용 허용 거리, 이 값을 초과하면 홀딩 취소 (cm 단위)
 	UPROPERTY(EditDefaultsOnly, Category="SF|Interaction")
 	float AcceptanceDistance = 10.f;
+
+private:
+
+	FTimerHandle HoldingTimerHandle;
 };

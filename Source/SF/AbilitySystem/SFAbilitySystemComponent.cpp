@@ -8,10 +8,8 @@
 #include "Animation/Enemy/SFEnemyAnimInstance.h"
 #include "Animation/Hero/SFHeroAnimInstance.h"
 #include "Attributes/SFPrimarySet.h"
-#include "Character/SFCharacterGameplayTags.h"
 #include "Character/Enemy/SFEnemy.h"
 #include "Character/Hero/SFHero.h"
-#include "GameplayEvent/SFGameplayEventTags.h"
 #include "Player/Save/SFPersistentDataType.h"
 
 
@@ -577,62 +575,3 @@ void USFAbilitySystemComponent::RestoreGameplayEffectsFromData(const FSFSavedAbi
 	UE_LOG(LogSF, Log, TEXT("RestoreGameplayEffectsFromData: Restored %d/%d effects"),
 		RestoredCount, InData.SavedGameplayEffects.Num());
 }
-
-void USFAbilitySystemComponent::ProcessHitReactionEvent(float Damage, const FGameplayEffectSpec& Spec)
-{
-	if (HasMatchingGameplayTag(SFGameplayTags::Character_State_Dead))
-		return;
-	
-	if (Damage <= 1.f)
-		return;
-	
-	FGameplayEventData Payload;
-	Payload.EventTag = SFGameplayTags::GameplayEvent_HitReaction;
-	Payload.Target = GetAvatarActor();
-	Payload.Instigator = Spec.GetContext().GetOriginalInstigator();
-	Payload.ContextHandle = Spec.GetContext();
-	Payload.EventMagnitude = Damage;
-
-	HandleGameplayEvent(SFGameplayTags::GameplayEvent_HitReaction, &Payload);
-}
-
-void USFAbilitySystemComponent::ProcessParryEvent(float Damage, const FGameplayEffectSpec& Spec)
-{
-	FGameplayEventData PayLoad;
-	PayLoad.EventTag = SFGameplayTags::GameplayEvent_Parry;
-	PayLoad.Target = GetAvatarActor();
-	PayLoad.Instigator = Spec.GetContext().GetOriginalInstigator();
-	PayLoad.ContextHandle = Spec.GetContext();
-	PayLoad.EventMagnitude = Damage;
-	HandleGameplayEvent(SFGameplayTags::GameplayEvent_Parry, &PayLoad);
-}
-
-void USFAbilitySystemComponent::ProcessDeathEvent(const FGameplayEffectSpec& Spec)
-{
-	if (HasMatchingGameplayTag(SFGameplayTags::Character_State_Dead))
-		return;
-	FGameplayEventData PayLoad;
-	PayLoad.EventTag = SFGameplayTags::GameplayEvent_Death;
-	PayLoad.Target = GetAvatarActor();
-	PayLoad.Instigator = Spec.GetContext().GetOriginalInstigator();
-	PayLoad.ContextHandle = Spec.GetContext();
-	HandleGameplayEvent(SFGameplayTags::GameplayEvent_Death, &PayLoad);
-}
-
-void USFAbilitySystemComponent::ProcessStaggerEvent(
-	const FGameplayEffectSpec& Spec)
-{
-
-	if (HasMatchingGameplayTag(SFGameplayTags::Character_State_Dead))
-		return;
-
-	FGameplayEventData Payload;
-	Payload.EventTag = SFGameplayTags::GameplayEvent_Groggy;
-	Payload.Target = GetAvatarActor();
-	Payload.Instigator = Spec.GetContext().GetInstigator();
-	Payload.ContextHandle = Spec.GetContext();
-
-	HandleGameplayEvent(SFGameplayTags::GameplayEvent_Groggy,&Payload);
-}
-
-

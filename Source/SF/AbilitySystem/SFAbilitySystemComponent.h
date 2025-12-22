@@ -101,11 +101,4 @@ protected:
 
 	// 현재 입력이 지속적으로 눌려있는 어빌리티들의 핸들.
 	TArray<FGameplayAbilitySpecHandle> InputHeldSpecHandles;
-
-//Effect
-public:
-	void ProcessHitReactionEvent(float Damage,const FGameplayEffectSpec& Spec);
-	void ProcessParryEvent(float Damage,const FGameplayEffectSpec& Spec);
-	void ProcessDeathEvent(const FGameplayEffectSpec& Spec);
-	void ProcessStaggerEvent(const FGameplayEffectSpec& Spec);
 };

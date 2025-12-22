@@ -44,7 +44,4 @@ protected:
 	
 	// 어빌리티가 성공적으로 초기화되었는지 여부 
 	bool bInitialized = false;
-
-	// 몽타주 재생으로 인해 무기를 숨겼는지 여부 
-	bool bHideWeaponsForMontage = false;
 };

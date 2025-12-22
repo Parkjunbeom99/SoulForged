@@ -14,6 +14,11 @@ void USFGA_Interact_Portal::ActivateAbility(const FGameplayAbilitySpecHandle Han
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
+	if (!bInitialized)
+	{
+		return;
+	}
+
 	ASFPortal* Portal = Cast<ASFPortal>(InteractableActor);
 	if (!Portal)
 	{

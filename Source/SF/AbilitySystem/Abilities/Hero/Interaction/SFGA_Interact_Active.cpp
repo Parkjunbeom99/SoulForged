@@ -3,11 +3,11 @@
 #include "AbilitySystemComponent.h"
 #include "Abilities/Tasks/AbilityTask_NetworkSyncPoint.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Abilities/Tasks/AbilityTask_WaitInputRelease.h"
 #include "AbilitySystem/Abilities/SFGameplayAbilityTags.h"
 #include "AbilitySystem/Tasks/Interaction/SFAbilityTask_WaitForInvalidInteraction.h"
 #include "Character/SFCharacterGameplayTags.h"
-#include "Interaction/SFWorldInteractable.h"
 #include "Character/SFCharacterBase.h"
 #include "Equipment/EquipmentComponent/SFEquipmentComponent.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
@@ -56,22 +56,42 @@ void USFGA_Interact_Active::ActivateAbility(const FGameplayAbilitySpecHandle Han
 	}
 
 	// 상호작용 엑터에 홀딩 시작 알림
-	if (ASFWorldInteractable* WorldInteractable = Cast<ASFWorldInteractable>(InteractableActor))
-	{
-		WorldInteractable->OnInteractActiveStarted(GetSFCharacterFromActorInfo());
-	}
+	NotifyInteractableActiveStarted();
 
-	// 즉시 실행 vs 홀딩 분기 결정
-	if (InteractionInfo.Duration <= 0.f)
+	// InteractionType에 따른 분기
+	switch (InteractionInfo.InteractionType)
 	{
-		// 지속시간이 0 이하면 즉시 실행 
+	case ESFInteractionType::Instant:
 		TriggerInteraction();
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return;
+	case ESFInteractionType::TimedHold:
+		StartHoldingInteraction();
+		GetWorld()->GetTimerManager().SetTimer(
+			HoldingTimerHandle, 
+			this, 
+			&ThisClass::OnDurationEnded, 
+			InteractionInfo.Duration, 
+			false
+		);
+		break;
+	case ESFInteractionType::GaugeBased:
+		StartHoldingInteraction();
+		WaitForGaugeBasedComplete();
+		break;
 	}
+}
 
-	// 기존 움직임 입력 플러시 (홀딩 중 의도치 않은 움직임 방지)
+void USFGA_Interact_Active::OnInvalidInteraction()
+{
+	// 홀딩 즉시 취소 (위치/각도 이탈로 인한 취소)
+	CancelAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true);
+}
+
+void USFGA_Interact_Active::StartHoldingInteraction()
+{
 	FlushPressedInput(MoveInputAction);
+	
 	if (ASFCharacterBase* SFCharacter = GetSFCharacterFromActorInfo())
 	{
 		if (UCharacterMovementComponent* CharacterMovement = SFCharacter->GetCharacterMovement())
@@ -85,12 +105,10 @@ void USFGA_Interact_Active::ActivateAbility(const FGameplayAbilitySpecHandle Han
 		}
 	}
 
-	// 홀딩 중 게임플레이 큐 시작 (사운드, 이펙트 등)
 	FGameplayCueParameters Parameters;
 	Parameters.Instigator = InteractableActor;
 	K2_AddGameplayCueWithParams(InteractionInfo.ActiveLoopGameplayCueTag, Parameters, true);
 
-	// UI에 홀딩 진행률 표시 시작 알림
 	if (IsLocallyControlled())
 	{
 		if (UGameplayMessageSubsystem::HasInstance(this))
@@ -98,48 +116,49 @@ void USFGA_Interact_Active::ActivateAbility(const FGameplayAbilitySpecHandle Han
 			FSFInteractionMessage Message;
 			Message.Instigator = GetAvatarActorFromActorInfo();
 			Message.bShouldRefresh = true;
-			Message.bSwitchActive = true; // 홀딩 상태로 전환
-			Message.InteractionInfo = InteractionInfo; // 홀딩 정보 (지속시간 등)
+			Message.bSwitchActive = true;
+			Message.InteractionInfo = InteractionInfo;
 			UGameplayMessageSubsystem& MessageSubsystem = UGameplayMessageSubsystem::Get(this);
 			MessageSubsystem.BroadcastMessage(SFGameplayTags::Message_Interaction_Progress, Message);
 		}
 	}
 
 	FSFMontagePlayData MontageData = GetInteractionStartMontage();
-	if (MontageData.IsValid())
+	if (MontageData.IsValid() && MontageData.Montage)
 	{
-		if (MontageData.Montage)
+		if (UAbilityTask_PlayMontageAndWait* PlayMontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, TEXT("InteractMontage"), MontageData.Montage, MontageData.PlayRate, MontageData.StartSection, true, 1.f, 0.f, false))
 		{
-			if (UAbilityTask_PlayMontageAndWait* PlayMontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, TEXT("InteractMontage"), MontageData.Montage, MontageData.PlayRate, MontageData.StartSection, true, 1.f, 0.f, false))
-			{
-				PlayMontageTask->ReadyForActivation();
-			}
+			PlayMontageTask->ReadyForActivation();
 		}
 	}
 
-	// 위치/각도 이탈 감지 태스크
 	if (USFAbilityTask_WaitForInvalidInteraction* InvalidInteractionTask = USFAbilityTask_WaitForInvalidInteraction::WaitForInvalidInteraction(this, AcceptanceAngle, AcceptanceDistance))
 	{
 		InvalidInteractionTask->OnInvalidInteraction.AddDynamic(this, &ThisClass::OnInvalidInteraction);
 		InvalidInteractionTask->ReadyForActivation();
 	}
 
-	// 입력 해제 감지 태스크
 	if (UAbilityTask_WaitInputRelease* InputReleaseTask = UAbilityTask_WaitInputRelease::WaitInputRelease(this, false))
 	{
 		InputReleaseTask->OnRelease.AddDynamic(this, &ThisClass::OnInputReleased);
 		InputReleaseTask->ReadyForActivation();
 	}
-	
-	// InteractionInfo.Duration 시간 후 OnDurationEnded() 호출
-	FTimerHandle TimerHandle;
-	GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &ThisClass::OnDurationEnded, InteractionInfo.Duration, false);
 }
 
-void USFGA_Interact_Active::OnInvalidInteraction()
+void USFGA_Interact_Active::NotifyInteractableActiveStarted()
 {
-	// 홀딩 즉시 취소 (위치/각도 이탈로 인한 취소)
-	CancelAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true);
+	if (Interactable)
+	{
+		Interactable->OnInteractActiveStarted(GetSFCharacterFromActorInfo());
+	}
+}
+
+void USFGA_Interact_Active::NotifyInteractableActiveEnded()
+{
+	if (Interactable)
+	{
+		Interactable->OnInteractActiveEnded(GetSFCharacterFromActorInfo());
+	}
 }
 
 void USFGA_Interact_Active::OnInputReleased(float TimeHeld)
@@ -204,6 +223,34 @@ bool USFGA_Interact_Active::TriggerInteraction()
 	return bCanActivate || bTriggerSuccessful;
 }
 
+void USFGA_Interact_Active::WaitForGaugeBasedComplete()
+{
+	if (!InteractionInfo.GaugeBasedCompleteEventTag.IsValid())
+	{
+		// 완료 이벤트 태그가 없으면 취소
+		CancelAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true);
+		return;
+	}
+
+	if (UAbilityTask_WaitGameplayEvent* WaitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, InteractionInfo.GaugeBasedCompleteEventTag))
+	{
+		WaitEventTask->EventReceived.AddDynamic(this, &ThisClass::OnGaugeBasedCompleted);
+		WaitEventTask->ReadyForActivation();
+	}
+}
+
+void USFGA_Interact_Active::OnGaugeBasedCompleted(FGameplayEventData Payload)
+{
+	if (TriggerInteraction())
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+	}
+	else
+	{
+		CancelAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true);
+	}
+}
+
 FSFMontagePlayData USFGA_Interact_Active::GetInteractionStartMontage() const
 {
 	if (InteractionInfo.ActiveStartMontageTag.IsValid())
@@ -219,6 +266,11 @@ FSFMontagePlayData USFGA_Interact_Active::GetInteractionStartMontage() const
 
 void USFGA_Interact_Active::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+	if (HoldingTimerHandle.IsValid())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(HoldingTimerHandle);
+	}
+	
 	if (ASFCharacterBase* SFCharacter = GetSFCharacterFromActorInfo())
 	{
 		if (bWasCancelled)
@@ -232,10 +284,7 @@ void USFGA_Interact_Active::EndAbility(const FGameplayAbilitySpecHandle Handle, 
 		}
 		
 		// 상호작용 대상에 홀딩 종료 알림
-		if (ASFWorldInteractable* WorldInteractable = Cast<ASFWorldInteractable>(InteractableActor))
-		{
-			WorldInteractable->OnInteractActiveEnded(SFCharacter);
-		}
+		NotifyInteractableActiveEnded();
 
 		if (IsLocallyControlled() && UGameplayMessageSubsystem::HasInstance(this))
 		{

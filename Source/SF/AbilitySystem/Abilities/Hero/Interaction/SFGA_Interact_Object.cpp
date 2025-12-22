@@ -7,7 +7,6 @@
 #include "Equipment/EquipmentComponent/SFEquipmentComponent.h"
 #include "Interaction/SFInteractable.h"
 #include "Interaction/SFInteractionQuery.h"
-#include "Interaction/SFWorldInteractable.h"
 
 USFGA_Interact_Object::USFGA_Interact_Object(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -59,9 +58,9 @@ void USFGA_Interact_Object::ActivateAbility(const FGameplayAbilitySpecHandle Han
 	// 초기화 완료 표시
 	bInitialized = true;
 
-	if (ASFWorldInteractable* WorldInteractable = Cast<ASFWorldInteractable>(TargetActor))
+	if (ISFInteractable* InteractableInterface = Cast<ISFInteractable>(InteractableActor))
 	{
-		WorldInteractable->OnInteractionSuccess(GetAvatarActorFromActorInfo());
+		InteractableInterface->OnInteractActiveEnded(GetAvatarActorFromActorInfo());
 	}
 
 	// 상호작용 중 플레이어가 범위를 벗어나면 취소
@@ -78,7 +77,6 @@ void USFGA_Interact_Object::ActivateAbility(const FGameplayAbilitySpecHandle Han
 		if (USFEquipmentComponent* EquipmentComp = GetEquipmentComponent())
 		{
 			EquipmentComp->HideWeapons();
-			bHideWeaponsForMontage = true;
 		}
 		if (UAbilityTask_PlayMontageAndWait* PlayMontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, TEXT("InteractMontage"), MontageData.Montage, MontageData.PlayRate, MontageData.StartSection, true, 1.f, 0.f, false))
 		{
@@ -107,18 +105,13 @@ FSFMontagePlayData USFGA_Interact_Object::GetInteractionEndMontage() const
 
 void USFGA_Interact_Object::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-	// 몽타주로 인해 무기를 숨겼으면 복원
-	if (bHideWeaponsForMontage)
+	if (USFEquipmentComponent* EquipmentComp = GetEquipmentComponent())
 	{
-		if (USFEquipmentComponent* EquipmentComp = GetEquipmentComponent())
-		{
-			EquipmentComp->ShowWeapons();
-			FSFMontagePlayData MontageData = GetMainHandEquipMontageData();
-			ExecuteMontageGameplayCue(MontageData);
-		}
-		bHideWeaponsForMontage = false;
+		EquipmentComp->ShowWeapons();
+		FSFMontagePlayData MontageData = GetMainHandEquipMontageData();
+		ExecuteMontageGameplayCue(MontageData);
 	}
-	
+
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
