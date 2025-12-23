@@ -1,24 +1,25 @@
 #include "SFGA_Hero_Downed.h"
 
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "AbilitySystem/SFAbilitySystemComponent.h"
 #include "AbilitySystem/Attributes/Hero/SFCombatSet_Hero.h"
 #include "AbilitySystem/Attributes/Hero/SFPrimarySet_Hero.h"
 #include "AbilitySystem/GameplayEvent/SFGameplayEventTags.h"
 #include "Animation/SFAnimationGameplayTags.h"
 #include "Character/SFCharacterGameplayTags.h"
 #include "Character/Hero/SFHero.h"
+#include "Equipment/EquipmentComponent/SFEquipmentComponent.h"
 #include "Libraries/SFAbilitySystemLibrary.h"
+#include "Player/SFPlayerController.h"
 #include "Player/Components/SFPlayerCombatStateComponent.h"
 
 USFGA_Hero_Downed::USFGA_Hero_Downed(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
 	ActivationPolicy = ESFAbilityActivationPolicy::Manual;
-	
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
 
-	// 다운 상태 태그 부여
 	ActivationOwnedTags.AddTag(SFGameplayTags::Character_State_Downed);
 	ActivationBlockedTags.AddTag(SFGameplayTags::Character_State_Downed);
 
@@ -34,18 +35,29 @@ USFGA_Hero_Downed::USFGA_Hero_Downed(const FObjectInitializer& ObjectInitializer
 void USFGA_Hero_Downed::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-	
-	PlayDownedMontage();
-	
-	if (!HasAuthority(&ActivationInfo))
-	{
-		return;
-	}
 
 	CachedDownedHero = Cast<ASFHero>(GetAvatarActorFromActorInfo());
 	if (!CachedDownedHero.IsValid())
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		return;
+	}
+
+	if (USFAbilitySystemComponent* ASC = GetSFAbilitySystemComponentFromActorInfo())
+	{
+		ASC->CancelActiveAbilitiesExceptOnSpawn(nullptr, nullptr, this);
+	}
+
+	if (USFEquipmentComponent* EquipmentComp = GetEquipmentComponent())
+	{
+		EquipmentComp->HideWeapons();
+	}
+	
+	DisablePlayerInput();
+	PlayDownedMontage();
+	
+	if (!HasAuthority(&ActivationInfo))
+	{
 		return;
 	}
 
@@ -148,8 +160,6 @@ void USFGA_Hero_Downed::HandleDeath()
 	{
 		USFAbilitySystemLibrary::SendDeathEvent(ASC);
 	}
-	
-	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void USFGA_Hero_Downed::HandleRevive()
@@ -195,6 +205,45 @@ void USFGA_Hero_Downed::HandleRevive()
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
+void USFGA_Hero_Downed::DisablePlayerInput()
+{
+	if (ASFHero* Hero = CachedDownedHero.Get())
+	{
+		if (UCharacterMovementComponent* MovementComp = Hero->GetCharacterMovement())
+		{
+			MovementComp->StopMovementImmediately();
+		}
+	}
+
+	if (ASFPlayerController* PC = GetSFPlayerControllerFromActorInfo())
+	{
+		PC->SetIgnoreMoveInput(true);
+        
+		// 카메라 회전도 막고 싶다면
+		// PC->SetIgnoreLookInput(true);
+	}
+
+	// ASC 입력 버퍼 클리어
+	if (IsLocallyControlled())
+	{
+		if (USFAbilitySystemComponent* ASC = GetSFAbilitySystemComponentFromActorInfo())
+		{
+			ASC->ClearAbilityInput();
+		}
+	}
+}
+
+void USFGA_Hero_Downed::RestorePlayerInput()
+{
+	if (ASFPlayerController* PC = GetSFPlayerControllerFromActorInfo())
+	{
+		PC->SetIgnoreMoveInput(false);
+        
+		// 카메라 회전도 막았다면:
+		// PC->SetIgnoreLookInput(false);
+	}
+}
+
 void USFGA_Hero_Downed::PlayDownedMontage()
 {
 	ASFHero* Hero = Cast<ASFHero>(GetAvatarActorFromActorInfo());
@@ -223,5 +272,19 @@ void USFGA_Hero_Downed::EndAbility(const FGameplayAbilitySpecHandle Handle, cons
 		World->GetTimerManager().ClearTimer(GaugeTickTimerHandle);
 	}
 
+	// 부활(정상 종료) 시에만 복구
+	if (!bWasCancelled)
+	{
+		if (USFEquipmentComponent* EquipmentComp = GetEquipmentComponent())
+		{
+			EquipmentComp->ShowWeapons();
+		}
+
+		FSFMontagePlayData MontageData = GetMainHandEquipMontageData();
+		ExecuteMontageGameplayCue(MontageData);
+        
+		RestorePlayerInput();
+	}
+	
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

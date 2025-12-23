@@ -33,6 +33,9 @@ private:
 	void HandleDeath();
 	void HandleRevive();
 
+	void DisablePlayerInput();
+	void RestorePlayerInput();
+	
 	void PlayDownedMontage();
 
 protected:

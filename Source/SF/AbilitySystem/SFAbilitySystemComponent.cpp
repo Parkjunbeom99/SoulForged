@@ -8,6 +8,7 @@
 #include "Animation/Enemy/SFEnemyAnimInstance.h"
 #include "Animation/Hero/SFHeroAnimInstance.h"
 #include "Attributes/SFPrimarySet.h"
+#include "Character/SFCharacterGameplayTags.h"
 #include "Character/Enemy/SFEnemy.h"
 #include "Character/Hero/SFHero.h"
 #include "Player/Save/SFPersistentDataType.h"
@@ -20,6 +21,9 @@ USFAbilitySystemComponent::USFAbilitySystemComponent(const FObjectInitializer& O
 	InputPressedSpecHandles.Reset();
 	InputReleasedSpecHandles.Reset();
 	InputHeldSpecHandles.Reset();
+
+	InputBlockedTags.AddTag(SFGameplayTags::Character_State_Downed);
+	InputBlockedTags.AddTag(SFGameplayTags::Character_State_Dead);
 }
 
 void USFAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor, AActor* InAvatarActor)
@@ -198,6 +202,16 @@ void USFAbilitySystemComponent::AbilityInputTagReleased(const FGameplayTag& Inpu
 
 void USFAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGamePaused)
 {
+	// 입력 차단 태그 체크 - 있으면 입력 버퍼만 클리어하고 리턴
+	if (HasAnyMatchingGameplayTags(InputBlockedTags))
+	{
+		InputStartedSpecHandles.Reset();
+		InputPressedSpecHandles.Reset();
+		InputReleasedSpecHandles.Reset();
+		// InputHeldSpecHandles는 유지 (키를 떼면 정상적으로 제거되도록)
+		return;
+	}
+
 	// 이번 프레임에 활성화할 어빌리티들을 저장할 정적 배열
 	// 정적 변수로 선언하여 매 프레임마다 메모리 할당을 피함
 	static TArray<FGameplayAbilitySpecHandle> AbilitiesToActivate;
@@ -574,4 +588,42 @@ void USFAbilitySystemComponent::RestoreGameplayEffectsFromData(const FSFSavedAbi
 
 	UE_LOG(LogSF, Log, TEXT("RestoreGameplayEffectsFromData: Restored %d/%d effects"),
 		RestoredCount, InData.SavedGameplayEffects.Num());
+}
+
+void USFAbilitySystemComponent::CancelActiveAbilitiesExceptOnSpawn(const FGameplayTagContainer* WithTags, const FGameplayTagContainer* WithoutTags, UGameplayAbility* Ignore)
+{
+	ABILITYLIST_SCOPE_LOCK();
+	
+	for (FGameplayAbilitySpec& Spec : ActivatableAbilities.Items)
+	{
+		if (!Spec.IsActive())
+		{
+			continue;
+		}
+		
+		// OnSpawn 어빌리티는 스킵
+		if (const USFGameplayAbility* SFAbility = Cast<USFGameplayAbility>(Spec.Ability))
+		{
+			if (SFAbility->GetActivationPolicy() == ESFAbilityActivationPolicy::OnSpawn)
+			{
+				continue;
+			}
+		}
+
+		// 태그 필터링
+		bool bCancel = true;
+		if (WithTags && !Spec.Ability->AbilityTags.HasAny(*WithTags))
+		{
+			bCancel = false;
+		}
+		if (WithoutTags && Spec.Ability->AbilityTags.HasAny(*WithoutTags))
+		{
+			bCancel = false;
+		}
+
+		if (bCancel)
+		{
+			CancelAbilitySpec(Spec, Ignore);
+		}
+	}
 }

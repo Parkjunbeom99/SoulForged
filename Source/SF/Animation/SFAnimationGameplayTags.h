@@ -15,4 +15,5 @@ namespace SFGameplayTags
 
 	// State Tags
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Montage_State_Downed);
+	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Montage_State_Death);
 }
