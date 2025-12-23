@@ -6,6 +6,9 @@
 #include "Character/SFCharacterBase.h"
 #include "SFHero.generated.h"
 
+class USFHeroWidgetComponent;
+class UWidgetComponent;
+class USFHeroOverheadWidget;
 class ASFPlayerController;
 /**
  * 
@@ -33,14 +36,27 @@ public:
 	// ~ End ISFInteractable
 
 	const TArray<TWeakObjectPtr<AActor>>& GetCachedRevivers() const { return CachedRevivers; }
+	USFHeroWidgetComponent* GetHeroWidgetComponent() const { return HeroWidgetComponent; }
 
 protected:
 	virtual void OnAbilitySystemInitialized() override;
+	virtual void OnAbilitySystemUninitialized() override;
+
+	void OnDownedTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "SF|Revive")
 	FSFInteractionInfo ReviveInteractionInfo;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SF|UI")
+	TObjectPtr<UWidgetComponent> OverheadWidgetComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SF|UI")
+	TObjectPtr<USFHeroWidgetComponent> HeroWidgetComponent;
+
+private:
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> CachedRevivers;
+
+	FDelegateHandle DownedTagDelegateHandle;
 };

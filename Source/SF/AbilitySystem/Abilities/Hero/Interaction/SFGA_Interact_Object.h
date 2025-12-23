@@ -40,6 +40,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="SF|Interaction")
 	float AcceptanceDistance = 100.f;
 
+	// 종료 몽타주 재생 여부
+	bool bHasEndMontage = false;
+
 protected:
 	
 	// 어빌리티가 성공적으로 초기화되었는지 여부 

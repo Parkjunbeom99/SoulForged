@@ -60,7 +60,7 @@ void USFGA_Interact_Object::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
 	if (ISFInteractable* InteractableInterface = Cast<ISFInteractable>(InteractableActor))
 	{
-		InteractableInterface->OnInteractActiveEnded(GetAvatarActorFromActorInfo());
+		InteractableInterface->OnInteractionSuccess(GetAvatarActorFromActorInfo());
 	}
 
 	// 상호작용 중 플레이어가 범위를 벗어나면 취소
@@ -72,7 +72,9 @@ void USFGA_Interact_Object::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
 	// 상호작용 대상에 대해 종료전 애니메이션 몽타주 재생
 	FSFMontagePlayData MontageData = GetInteractionEndMontage();
-	if (MontageData.IsValid() && MontageData.Montage)
+	bHasEndMontage = MontageData.IsValid() && MontageData.Montage;
+
+	if (bHasEndMontage)
 	{
 		if (USFEquipmentComponent* EquipmentComp = GetEquipmentComponent())
 		{
@@ -108,8 +110,15 @@ void USFGA_Interact_Object::EndAbility(const FGameplayAbilitySpecHandle Handle, 
 	if (USFEquipmentComponent* EquipmentComp = GetEquipmentComponent())
 	{
 		EquipmentComp->ShowWeapons();
-		FSFMontagePlayData MontageData = GetMainHandEquipMontageData();
-		ExecuteMontageGameplayCue(MontageData);
+	}
+	
+	if (bHasEndMontage)
+	{
+		if (USFEquipmentComponent* EquipmentComp = GetEquipmentComponent())
+		{
+			FSFMontagePlayData MontageData = GetMainHandEquipMontageData();
+			ExecuteMontageGameplayCue(MontageData);
+		}
 	}
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

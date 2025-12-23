@@ -21,8 +21,7 @@ ASFCharacterBase::ASFCharacterBase(const FObjectInitializer& ObjectInitializer)
 	InteractionBox->SetBoxExtent(FVector(50.f, 50.f, 90.f));
 	InteractionBox->SetCollisionProfileName(TEXT("Interactable"));
 	InteractionBox->SetCollisionResponseToAllChannels(ECR_Ignore);
-	InteractionBox->SetCollisionResponseToChannel(SF_TraceChannel_Interaction, ECR_Block);
-	
+
 	// SFPawnExtensionComponent만 native c++로 설정해 줌. 해당 컴포넌트가 다른 컴포넌트들의
 	// 초기화를 담당하는 컴포넌트이기 떄문에 가장 먼저 생성해 주어야 한다. 엔진에서는  native c++의 컴포넌트가 먼저 생성되고 
 	// 이후에 블루프린트에서 만든 컴포넌트들이 생성되도록 구현되어 있다. 

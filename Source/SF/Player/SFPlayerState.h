@@ -49,6 +49,8 @@ class SF_API ASFPlayerState : public APlayerState, public IAbilitySystemInterfac
 public:
 	ASFPlayerState(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 	//~ IGenericTeamAgentInterface
 	virtual void SetGenericTeamId(const FGenericTeamId& NewTeamID) override;
 	virtual FGenericTeamId GetGenericTeamId() const override;

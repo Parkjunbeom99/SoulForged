@@ -38,6 +38,17 @@ ASFPlayerState::ASFPlayerState(const FObjectInitializer& ObjectInitializer)
 	SetNetUpdateFrequency(100.f);
 }
 
+void ASFPlayerState::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (PawnDataHandle.IsValid())
+	{
+		PawnDataHandle->CancelHandle();
+		PawnDataHandle.Reset();
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
 void ASFPlayerState::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -188,13 +199,18 @@ void ASFPlayerState::StartLoadingPawnData()
 		if (!PawnDataPath.IsNull())
 		{
 			UE_LOG(LogSF, Log, TEXT("Starting async load of PawnData for player %s"), *GetPlayerName());
+
+			TWeakObjectPtr<ASFPlayerState> WeakThis(this);
             
 			// 비동기 로드 시작
-			FStreamableDelegate OnLoaded = FStreamableDelegate::CreateLambda([this, PawnDataPath]()
+			FStreamableDelegate OnLoaded = FStreamableDelegate::CreateLambda([WeakThis, PawnDataPath]()
 			{
-				if (USFPawnData* LoadedPawnData = PawnDataPath.Get())
+				if (ASFPlayerState* StrongThis = WeakThis.Get())
 				{
-					OnPawnDataLoadComplete(LoadedPawnData);
+					if (USFPawnData* LoadedPawnData = PawnDataPath.Get())
+					{
+						StrongThis->OnPawnDataLoadComplete(LoadedPawnData);
+					}
 				}
 			});
 			PawnDataHandle = USFAssetManager::Get().LoadPawnDataAsync(PawnDataPath, OnLoaded);
