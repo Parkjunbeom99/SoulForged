@@ -16,11 +16,16 @@ struct FSFHeroCombatInfo
 	// 다른 플레이어 부활시킨 횟수
 	UPROPERTY(BlueprintReadOnly)
 	int32 ReviveCount = 0;
+
+	// 완전히 죽은 상태
+	UPROPERTY(BlueprintReadOnly)
+	bool bIsDead = false;
 	
 	bool operator!=(const FSFHeroCombatInfo& Other) const
 	{
 		return RemainingDownCount != Other.RemainingDownCount 
-			|| ReviveCount != Other.ReviveCount;
+			|| ReviveCount != Other.ReviveCount
+			|| bIsDead != Other.bIsDead;
 	}
 
 	bool operator==(const FSFHeroCombatInfo& Other) const
@@ -67,6 +72,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "SF|Combat")
 	int32 GetReviveCount() const { return CombatInfo.ReviveCount; }
 
+	UFUNCTION(BlueprintPure, Category = "SF|Combat")
+	bool IsDead() const { return CombatInfo.bIsDead; }
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "SF|Combat")
+	void SetIsDead(bool bNewIsDead);
+
 	UFUNCTION(BlueprintCallable, Category = "SF|Combat")
 	void DecrementDownCount();
 
@@ -85,10 +96,13 @@ protected:
 	// 변경 감지 후 브로드캐스트
 	void BroadcastCombatInfoChanged();
 
+	// Dead 상태 변경 시 별도 GMS broadcast
+	void BroadcastDeadStateChanged();
+
 public:
 	UPROPERTY(BlueprintAssignable, Category = "SF|Combat")
 	FOnHeroCombatInfoChanged OnCombatInfoChanged;
-
+	
 protected:
 
 	// RemainingDownCount별 초기 ReviveGauge 값 (index 0 = 첫 다운)

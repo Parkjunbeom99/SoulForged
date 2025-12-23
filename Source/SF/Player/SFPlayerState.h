@@ -77,6 +77,9 @@ public:
 	void SetIsReadyForTravel(bool bInIsReadyForTravel);
 	bool GetIsReadyForTravel() const { return bIsReadyForTravel; }
 
+	UFUNCTION(BlueprintPure, Category = "SF|PlayerState")
+	bool IsDead() const;
+
 	//~AActor interface
 	virtual void PostInitializeComponents() override;
 	//~End of AActor interface

@@ -40,3 +40,18 @@ struct FSFPlayerTravelReadyMessage
 	UPROPERTY(BlueprintReadOnly, Category = "GameplayMessage")
 	bool bIsReadyToTravel = false;
 };
+
+/**
+ * 플레이어 Dead 상태 변경 메시지
+ */
+USTRUCT(BlueprintType)
+struct FSFPlayerDeadStateMessage
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly)
+	TObjectPtr<APlayerState> PlayerState = nullptr;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bIsDead = false;
+};

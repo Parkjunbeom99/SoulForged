@@ -172,6 +172,15 @@ UAbilitySystemComponent* ASFPlayerState::GetAbilitySystemComponent() const
 	return AbilitySystemComponent;
 }
 
+bool ASFPlayerState::IsDead() const
+{
+	if (CombatStateComponent)
+	{
+		return CombatStateComponent->IsDead();
+	}
+	return false;
+}
+
 void ASFPlayerState::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
@@ -244,8 +253,6 @@ void ASFPlayerState::OnPawnDataLoadComplete(const USFPawnData* LoadedPawnData)
 	// 델리게이트 브로드캐스트 - GameMode가 처리
 	OnPawnDataLoaded.Broadcast(LoadedPawnData);
 }
-
-
 
 void ASFPlayerState::SetPawnData(const USFPawnData* InPawnData)
 {

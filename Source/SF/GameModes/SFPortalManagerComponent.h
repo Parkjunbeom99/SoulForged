@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/GameStateComponent.h"
+#include "GameFramework/GameplayMessageSubsystem.h"
 #include "Messages/SFPortalInfoMessages.h"
 #include "SFPortalManagerComponent.generated.h"
 
@@ -37,7 +38,8 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "SF|Portal")
     bool IsTravelCountdownActive() const { return PortalState.bIsActive && PortalState.TravelCountdown <= TravelDelayTime; }
-    
+
+    // Ready 상태인 살아있는 플레이어 수
     UFUNCTION(BlueprintPure, Category = "SF|Portal")
     int32 GetReadyPlayerCount() const;
 
@@ -63,6 +65,8 @@ private:
 
     UFUNCTION()
     void OnRep_PortalState();
+
+    void OnPlayerDeadStateChanged(FGameplayTag Channel, const FSFPlayerDeadStateMessage& Message);
 
 private:
     /** Portal 활성화 상태 */
@@ -90,4 +94,6 @@ private:
 
     UPROPERTY()
     TObjectPtr<ASFPortal> ManagedPortal;
+
+    FGameplayMessageListenerHandle DeadStateListenerHandle;
 };

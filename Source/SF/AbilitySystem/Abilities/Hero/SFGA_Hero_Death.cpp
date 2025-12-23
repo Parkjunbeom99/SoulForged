@@ -8,6 +8,8 @@
 #include "Character/Hero/SFHero.h"
 #include "Equipment/EquipmentComponent/SFEquipmentComponent.h"
 #include "Player/SFPlayerController.h"
+#include "Player/SFPlayerState.h"
+#include "Player/Components/SFPlayerCombatStateComponent.h"
 
 
 USFGA_Hero_Death::USFGA_Hero_Death(const FObjectInitializer& ObjectInitializer)
@@ -32,6 +34,14 @@ USFGA_Hero_Death::USFGA_Hero_Death(const FObjectInitializer& ObjectInitializer)
 void USFGA_Hero_Death::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+
+	if (HasAuthority(&CurrentActivationInfo))
+	{
+		if (USFPlayerCombatStateComponent* CombatState = USFPlayerCombatStateComponent::FindPlayerCombatStateComponent(GetAvatarActorFromActorInfo()))
+		{
+			CombatState->SetIsDead(true);
+		}
+	}
 
 	CancelAllActiveAbilities();
 	HideWeapons();

@@ -11,5 +11,5 @@ namespace SFGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Message_Interaction_Notice, "Message.Interaction.Notice");
 	UE_DEFINE_GAMEPLAY_TAG(Message_Interaction_Progress, "Message.Interaction.Progress");
 	UE_DEFINE_GAMEPLAY_TAG(Message_RewardSelection_Complete, "Message.RewardSelection.Complete");
-
+	UE_DEFINE_GAMEPLAY_TAG(Message_Player_DeadStateChanged, "Message.Player.DeadStateChanged");
 }

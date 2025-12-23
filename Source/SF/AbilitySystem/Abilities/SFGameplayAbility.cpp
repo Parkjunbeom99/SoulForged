@@ -12,6 +12,7 @@
 #include "Equipment/EquipmentComponent/SFEquipmentComponent.h"
 #include "Input/SFEnhancedPlayerInput.h"
 #include "Player/SFPlayerController.h"
+#include "Player/SFPlayerState.h"
 
 #define ENSURE_ABILITY_IS_INSTANTIATED_OR_RETURN(FunctionName, ReturnValue)																				\
 {																																						\
@@ -37,6 +38,11 @@ USFAbilitySystemComponent* USFGameplayAbility::GetSFAbilitySystemComponentFromAc
 ASFPlayerController* USFGameplayAbility::GetSFPlayerControllerFromActorInfo() const
 {
 	return (CurrentActorInfo ? Cast<ASFPlayerController>(CurrentActorInfo->PlayerController.Get()) : nullptr);
+}
+
+ASFPlayerState* USFGameplayAbility::GetSFPlayerStateFromActorInfo() const
+{
+	return (CurrentActorInfo ? Cast<ASFPlayerState>(CurrentActorInfo->OwnerActor.Get()) : nullptr);
 }
 
 ASFCharacterBase* USFGameplayAbility::GetSFCharacterFromActorInfo() const

@@ -1,6 +1,10 @@
 #include "SFPlayerCombatStateComponent.h"
 
+#include "GameFramework/GameplayMessageSubsystem.h"
+#include "Messages/SFMessageGameplayTags.h"
+#include "Messages/SFPortalInfoMessages.h"
 #include "Net/UnrealNetwork.h"
+#include "Player/SFPlayerState.h"
 
 USFPlayerCombatStateComponent::USFPlayerCombatStateComponent(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -62,6 +66,22 @@ float USFPlayerCombatStateComponent::GetInitialReviveGauge() const
 	return 0.f;
 }
 
+void USFPlayerCombatStateComponent::SetIsDead(bool bNewIsDead)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority())
+    {
+        return;
+    }
+
+    if (CombatInfo.bIsDead != bNewIsDead)
+    {
+        CombatInfo.bIsDead = bNewIsDead;
+
+        BroadcastCombatInfoChanged();
+        BroadcastDeadStateChanged();
+    }
+}
+
 void USFPlayerCombatStateComponent::DecrementDownCount()
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority())
@@ -103,7 +123,14 @@ void USFPlayerCombatStateComponent::IncrementReviveCount()
 
 void USFPlayerCombatStateComponent::OnRep_CombatInfo()
 {
+	const bool bDeadChanged = (CachedCombatInfo.bIsDead != CombatInfo.bIsDead);
+
 	BroadcastCombatInfoChanged();
+	// Dead 상태 변경 감지에 따라 추가적인 Message 전달 처리
+	if (bDeadChanged)
+	{
+		BroadcastDeadStateChanged();
+	}
 }
 
 void USFPlayerCombatStateComponent::BroadcastCombatInfoChanged()
@@ -122,8 +149,27 @@ void USFPlayerCombatStateComponent::SetCombatInfoFromTravel(const FSFHeroCombatI
 		return;
 	}
 
+	const bool bWasDead = CombatInfo.bIsDead;
+	
 	CombatInfo = InCombatInfo;
 	CachedCombatInfo = CombatInfo;
+
+	if (CombatInfo.bIsDead != bWasDead)
+	{
+		BroadcastDeadStateChanged();
+	}
+}
+
+void USFPlayerCombatStateComponent::BroadcastDeadStateChanged()
+{
+	if (UGameplayMessageSubsystem::HasInstance(this))
+	{
+		UGameplayMessageSubsystem& MessageSubsystem = UGameplayMessageSubsystem::Get(this);
+		FSFPlayerDeadStateMessage Message;
+		Message.PlayerState = Cast<APlayerState>(GetOwner());
+		Message.bIsDead = CombatInfo.bIsDead;
+		MessageSubsystem.BroadcastMessage(SFGameplayTags::Message_Player_DeadStateChanged, Message);
+	}
 }
 
 #if WITH_EDITOR

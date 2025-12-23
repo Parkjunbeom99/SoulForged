@@ -28,11 +28,20 @@ void USFPortalManagerComponent::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 void USFPortalManagerComponent::BeginPlay()
 {
     Super::BeginPlay();
-
-    // 중간에 플레이어 로그아웃한 케이스 처리를 위한 바인딩
-    if (ASFGameState* SFGameState = GetGameState<ASFGameState>())
+    
+    if (GetOwner()->HasAuthority())
     {
-        SFGameState->OnPlayerRemoved.AddDynamic(this, &USFPortalManagerComponent::HandlePlayerRemoved);
+        // 중간에 플레이어 로그아웃한 케이스 처리를 위한 바인딩
+        if (ASFGameState* SFGameState = GetGameState<ASFGameState>())
+        {
+            SFGameState->OnPlayerRemoved.AddDynamic(this, &USFPortalManagerComponent::HandlePlayerRemoved);
+        }
+
+        if (UGameplayMessageSubsystem::HasInstance(this))
+        {
+            UGameplayMessageSubsystem& MessageSubsystem = UGameplayMessageSubsystem::Get(this);
+            DeadStateListenerHandle = MessageSubsystem.RegisterListener(SFGameplayTags::Message_Player_DeadStateChanged,this, &ThisClass::OnPlayerDeadStateChanged);
+        }
     }
 }
 
@@ -41,6 +50,11 @@ void USFPortalManagerComponent::EndPlay(const EEndPlayReason::Type EndPlayReason
     if (UWorld* World = GetWorld())
     {
         World->GetTimerManager().ClearAllTimersForObject(this);
+
+        if (UGameplayMessageSubsystem::HasInstance(this))
+        {
+            UGameplayMessageSubsystem::Get(World).UnregisterListener(DeadStateListenerHandle);
+        }
     }
     
     if (ASFGameState* SFGameState = GetGameState<ASFGameState>())
@@ -105,6 +119,11 @@ void USFPortalManagerComponent::TogglePlayerReady(APlayerState* PlayerState)
         return;
     }
 
+    if (SFPS->IsDead())
+    {
+        return;
+    }
+
     const bool bWasReady = SFPS->GetIsReadyForTravel();
     const bool bNewReadyState = !bWasReady;
     SFPS->SetIsReadyForTravel(bNewReadyState);
@@ -154,6 +173,7 @@ void USFPortalManagerComponent::CheckAllPlayersReady()
     int32 ReadyCount = GetReadyPlayerCount();
     int32 RequiredCount = GetRequiredPlayerCount();
 
+    // 살아있는 플레이어가 없으면 Travel 하지 않음 (전멸 상태)
     if (RequiredCount <= 0)
     {
         return;
@@ -230,9 +250,10 @@ int32 USFPortalManagerComponent::GetReadyPlayerCount() const
     const AGameStateBase* GameState = GetGameStateChecked<AGameStateBase>();
     for (APlayerState* PS : GameState->PlayerArray)
     {
-        if (const ASFPlayerState* SFPlayerState = Cast<ASFPlayerState>(PS))
+        if (const ASFPlayerState* SFPS = Cast<ASFPlayerState>(PS))
         {
-            if (SFPlayerState->GetIsReadyForTravel())
+            // Dead가 아니고 Ready인 플레이어만 카운트
+            if (!SFPS->IsDead() && SFPS->GetIsReadyForTravel())
             {
                 ReadyCount++;
             }
@@ -245,15 +266,19 @@ int32 USFPortalManagerComponent::GetReadyPlayerCount() const
 int32 USFPortalManagerComponent::GetRequiredPlayerCount() const
 {
     const AGameStateBase* GameState = GetGameStateChecked<AGameStateBase>();
-    int32 ValidPlayerCount = 0;
+    int32 AlivePlayerCount = 0;
     for (APlayerState* PS : GameState->PlayerArray)
     {
-        if (PS && !PS->IsInactive())
+        if (const ASFPlayerState* SFPS = Cast<ASFPlayerState>(PS))
         {
-            ValidPlayerCount++;
+            // Inactive가 아니고 Dead가 아닌 플레이어만 카운트
+            if (!PS->IsInactive() && !SFPS->IsDead())
+            {
+                AlivePlayerCount++;
+            }
         }
     }
-    return ValidPlayerCount;
+    return AlivePlayerCount;
 }
 
 void USFPortalManagerComponent::HandlePlayerRemoved(APlayerState* PlayerState)
@@ -308,4 +333,20 @@ void USFPortalManagerComponent::OnRep_PortalState()
             }
         }
     }
+}
+
+void USFPortalManagerComponent::OnPlayerDeadStateChanged(FGameplayTag Channel, const FSFPlayerDeadStateMessage& Message)
+{
+    if (!GetOwner()->HasAuthority())
+    {
+        return;
+    }
+
+    // Portal이 활성화 상태면 Ready 체크 재계산
+    if (bPortalActive && !bIsTravelCountdownActive)
+    {
+        CheckAllPlayersReady();
+    }
+
+    BroadcastPortalState();
 }

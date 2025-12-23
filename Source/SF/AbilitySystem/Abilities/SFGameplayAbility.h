@@ -7,6 +7,7 @@
 #include "Character/Hero/Component/SFHeroMovementComponent.h"
 #include "SFGameplayAbility.generated.h"
 
+class ASFPlayerState;
 class UInputAction;
 class USFEquipmentComponent;
 class USFHeroAnimationData;
@@ -44,6 +45,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "SF|Ability")
 	ASFPlayerController* GetSFPlayerControllerFromActorInfo() const;
+
+	UFUNCTION(BlueprintPure, Category = "SF|Ability")
+	ASFPlayerState* GetSFPlayerStateFromActorInfo() const;
 	
 	UFUNCTION(BlueprintCallable, Category = "SF|Ability")
 	ASFCharacterBase* GetSFCharacterFromActorInfo() const;

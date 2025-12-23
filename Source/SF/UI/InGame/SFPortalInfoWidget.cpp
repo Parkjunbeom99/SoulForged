@@ -52,6 +52,12 @@ void USFPortalInfoWidget::NativeConstruct()
         SFGameplayTags::Message_Player_TravelReadyChanged, 
         this, 
         &USFPortalInfoWidget::HandlePlayerReadyChanged);
+
+    // Dead 상태 변경 리스너 등록
+    DeadStateListenerHandle = MessageSubsystem.RegisterListener(
+        SFGameplayTags::Message_Player_DeadStateChanged,
+        this,
+        &USFPortalInfoWidget::HandlePlayerDeadStateChanged);
 }
 
 void USFPortalInfoWidget::NativeDestruct()
@@ -64,8 +70,13 @@ void USFPortalInfoWidget::NativeDestruct()
             SFGameState->OnPlayerAdded.RemoveAll(this);
             SFGameState->OnPlayerRemoved.RemoveAll(this);
         }
-        UGameplayMessageSubsystem::Get(World).UnregisterListener(PortalInfoListenerHandle);
-        UGameplayMessageSubsystem::Get(World).UnregisterListener(PlayerReadyListenerHandle);
+        if (UGameplayMessageSubsystem::HasInstance(this))
+        {
+            UGameplayMessageSubsystem& GMS = UGameplayMessageSubsystem::Get(World);
+            GMS.UnregisterListener(PortalInfoListenerHandle);
+            GMS.UnregisterListener(PlayerReadyListenerHandle);
+            GMS.UnregisterListener(DeadStateListenerHandle);
+        }
     }
     
     Super::NativeDestruct();
@@ -175,6 +186,14 @@ void USFPortalInfoWidget::HandlePlayerReadyChanged(FGameplayTag Channel, const F
     {
         // Entry 위젯 내부의 함수를 호출하여 '준비' UI만 업데이트
         EntryToUpdate->SetReadyStatus(Message.bIsReadyToTravel);
+    }
+}
+
+void USFPortalInfoWidget::HandlePlayerDeadStateChanged(FGameplayTag Channel, const FSFPlayerDeadStateMessage& Message)
+{
+    if (USFPortalInfoEntryWidget* Entry = PortalEntryMap.FindRef(Message.PlayerState))
+    {
+        Entry->SetDeadStatus(Message.bIsDead);
     }
 }
 
