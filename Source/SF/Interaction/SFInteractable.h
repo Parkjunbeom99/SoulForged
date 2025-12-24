@@ -84,7 +84,7 @@ public:
 	virtual void GetMeshComponents(TArray<UMeshComponent*>& OutMeshComponents) const { }
 
 	UFUNCTION(BlueprintCallable)
-	virtual bool CanInteraction(const FSFInteractionQuery& InteractionQuery) const { return true; }
+	virtual bool CanInteraction(const FSFInteractionQuery& InteractionQuery) const;
 
 	virtual void OnInteractActiveStarted(AActor* Interactor) {}
 	virtual void OnInteractActiveEnded(AActor* Interactor) {}

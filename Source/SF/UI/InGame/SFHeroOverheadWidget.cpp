@@ -6,10 +6,10 @@
 
 void USFHeroOverheadWidget::SetPlayerName(const FString& Name)
 {
-	if (NameText)
-	{
-		NameText->SetText(FText::FromString(Name));
-	}
+	// if (NameText)
+	// {
+	// 	NameText->SetText(FText::FromString(Name));
+	// }
 }
 
 void USFHeroOverheadWidget::SetReviveGaugeVisible(bool bVisible)

@@ -55,17 +55,22 @@ FSFInteractionInfo ASFHero::GetPreInteractionInfo(const FSFInteractionQuery& Int
 
 bool ASFHero::CanInteraction(const FSFInteractionQuery& InteractionQuery) const
 {
+	if (!ISFInteractable::CanInteraction(InteractionQuery))
+	{
+		return false;
+	}
+	
+	if (InteractionQuery.RequestingAvatar.Get() == this)
+	{
+		return false;
+	}
+	
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
 	if (!ASC || !ASC->HasMatchingGameplayTag(SFGameplayTags::Character_State_Downed))
 	{
 		return false;
 	}
-
-	if (InteractionQuery.RequestingAvatar.Get() == this)
-	{
-		return false;
-	}
-
+	
 	return true;
 }
 

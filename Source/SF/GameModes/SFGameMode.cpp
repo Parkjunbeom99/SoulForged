@@ -192,6 +192,11 @@ bool ASFGameMode::PlayerCanRestart_Implementation(APlayerController* Player)
 			UE_LOG(LogSF, Verbose, TEXT("PlayerCanRestart: false - PawnData not loaded"));
 			return false;
 		}
+
+		if (SFPS->IsDead())
+		{
+			return false;
+		}
 	}
 	
 	return Super::PlayerCanRestart_Implementation(Player);

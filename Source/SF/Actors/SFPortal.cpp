@@ -77,6 +77,11 @@ FSFInteractionInfo ASFPortal::GetPreInteractionInfo(const FSFInteractionQuery& I
 
 bool ASFPortal::CanInteraction(const FSFInteractionQuery& InteractionQuery) const
 {
+	if (!ISFInteractable::CanInteraction(InteractionQuery))
+	{
+		return false;
+	}
+	
 	if (!bIsEnabled)
 	{
 		return false;

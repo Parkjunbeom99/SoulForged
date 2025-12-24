@@ -99,6 +99,11 @@ void ASFWorldInteractable::OnInteractionSuccess(AActor* Interactor)
 
 bool ASFWorldInteractable::CanInteraction(const FSFInteractionQuery& InteractionQuery) const
 {
+	if (!ISFInteractable::CanInteraction(InteractionQuery))
+	{
+		return false;
+	}
+	
 	return bShouldConsume ? (bWasConsumed == false) : true;
 }
 

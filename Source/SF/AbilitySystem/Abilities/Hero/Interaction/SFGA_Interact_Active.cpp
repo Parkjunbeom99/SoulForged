@@ -67,6 +67,7 @@ void USFGA_Interact_Active::ActivateAbility(const FGameplayAbilitySpecHandle Han
 		return;
 	case ESFInteractionType::TimedHold:
 		StartHoldingInteraction();
+		SendProgressMessage();
 		GetWorld()->GetTimerManager().SetTimer(
 			HoldingTimerHandle, 
 			this, 
@@ -77,6 +78,7 @@ void USFGA_Interact_Active::ActivateAbility(const FGameplayAbilitySpecHandle Han
 		break;
 	case ESFInteractionType::GaugeBased:
 		StartHoldingInteraction();
+		SendInteractingMessage();
 		WaitForGaugeBasedComplete();
 		break;
 	}
@@ -109,20 +111,6 @@ void USFGA_Interact_Active::StartHoldingInteraction()
 	Parameters.Instigator = InteractableActor;
 	K2_AddGameplayCueWithParams(InteractionInfo.ActiveLoopGameplayCueTag, Parameters, true);
 
-	if (IsLocallyControlled())
-	{
-		if (UGameplayMessageSubsystem::HasInstance(this))
-		{
-			FSFInteractionMessage Message;
-			Message.Instigator = GetAvatarActorFromActorInfo();
-			Message.bShouldRefresh = true;
-			Message.bSwitchActive = true;
-			Message.InteractionInfo = InteractionInfo;
-			UGameplayMessageSubsystem& MessageSubsystem = UGameplayMessageSubsystem::Get(this);
-			MessageSubsystem.BroadcastMessage(SFGameplayTags::Message_Interaction_Progress, Message);
-		}
-	}
-
 	FSFMontagePlayData MontageData = GetInteractionStartMontage();
 	if (MontageData.IsValid() && MontageData.Montage)
 	{
@@ -142,6 +130,40 @@ void USFGA_Interact_Active::StartHoldingInteraction()
 	{
 		InputReleaseTask->OnRelease.AddDynamic(this, &ThisClass::OnInputReleased);
 		InputReleaseTask->ReadyForActivation();
+	}
+}
+
+void USFGA_Interact_Active::SendProgressMessage()
+{
+	if (IsLocallyControlled())
+	{
+		if (UGameplayMessageSubsystem::HasInstance(this))
+		{
+			FSFInteractionMessage Message;
+			Message.Instigator = GetAvatarActorFromActorInfo();
+			Message.bShouldRefresh = true;
+			Message.bSwitchActive = true;
+			Message.InteractionInfo = InteractionInfo;
+			UGameplayMessageSubsystem& MessageSubsystem = UGameplayMessageSubsystem::Get(this);
+			MessageSubsystem.BroadcastMessage(SFGameplayTags::Message_Interaction_Progress, Message);
+		}
+	}
+}
+
+void USFGA_Interact_Active::SendInteractingMessage()
+{
+	if (IsLocallyControlled())
+	{
+		if (UGameplayMessageSubsystem::HasInstance(this))
+		{
+			FSFInteractionMessage Message;
+			Message.Instigator = GetAvatarActorFromActorInfo();
+			Message.bShouldRefresh = true;
+			Message.bSwitchActive = true;
+			Message.InteractionInfo = InteractionInfo;
+			UGameplayMessageSubsystem& MessageSubsystem = UGameplayMessageSubsystem::Get(this);
+			MessageSubsystem.BroadcastMessage(SFGameplayTags::Message_Interaction_Interacting, Message);
+		}
 	}
 }
 

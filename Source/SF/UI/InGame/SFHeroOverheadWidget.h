@@ -24,8 +24,8 @@ public:
 	void SetReviveGaugePercent(float Percent);
 
 protected:
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UTextBlock> NameText;
+	// UPROPERTY(meta = (BindWidget))
+	// TObjectPtr<UTextBlock> NameText;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UPanelWidget> ReviveGaugePanel;

@@ -34,6 +34,9 @@ private:
 
 	void StartHoldingInteraction();
 
+	void SendProgressMessage();
+	void SendInteractingMessage();
+
 	/** ISFInteractable에 홀딩 시작 알림 */
 	void NotifyInteractableActiveStarted();
 
