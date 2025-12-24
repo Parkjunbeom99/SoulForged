@@ -25,6 +25,8 @@ public:
 
 	void SetReadyStatus(bool bIsReady);
 
+	void SetDeadStatus(bool bIsDead);
+
 protected:
 	virtual void NativeDestruct() override;
 
@@ -49,4 +51,6 @@ protected:
 private:
 	/** Hero 아이콘의 비동기 로드를 관리하는 핸들 */
 	TSharedPtr<FStreamableHandle> IconLoadHandle;
+
+	bool bIsPlayerDead = false;
 };

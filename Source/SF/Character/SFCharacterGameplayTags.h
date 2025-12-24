@@ -13,6 +13,7 @@ namespace SFGameplayTags
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Character_State_ComboWindow);
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Character_State_UsingAbility);
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Character_State_Skill);
+	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Character_State_Downed);
 	
 	// ========== 방어/회피 ==========
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Character_State_Blocking);
@@ -34,4 +35,7 @@ namespace SFGameplayTags
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Character_State_Health);
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Character_State_Mana);
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Character_State_Stamina);
+	
+	// ========== 상호작용 ==========
+	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Character_State_Interact);
 }

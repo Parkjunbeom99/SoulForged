@@ -64,17 +64,7 @@ private:
 	/** PIE 테스트 모드 활성화 여부*/
 	UPROPERTY(EditDefaultsOnly, Category = "SF|Test")
 	bool bUsePIETestMode = false;
-
-	/** TODO : 테스트용 자동 포탈 활성화 여부 (삭제 예정)*/
-	UPROPERTY(EditDefaultsOnly, Category = "SF|Test|Portal")
-	bool bAutoActivatePortal = true;
-
-	/** TODO : 게임 시작 후 포탈 활성화까지 대기 시간 (삭제 예정)*/
-	UPROPERTY(EditDefaultsOnly, Category = "SF|Test|Portal", meta = (EditCondition = "bAutoActivatePortal", ClampMin = "0.0"))
-	float PortalActivationDelay = 5.0f;
-
-	FTimerHandle PortalActivationTimerHandle;
-
+	
 	UPROPERTY()
 	TArray<APlayerStart*> AssignedPlayerStarts;
 };

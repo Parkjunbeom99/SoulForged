@@ -7,8 +7,7 @@
 #include "GameplayEffectExtension.h"
 #include "AbilitySystem/GameplayEvent/SFGameplayEventTags.h"
 #include "Character/SFCharacterGameplayTags.h"
-
-
+#include "Libraries/SFAbilitySystemLibrary.h"
 
 
 USFPrimarySet::USFPrimarySet()
@@ -80,7 +79,7 @@ void USFPrimarySet::PostGameplayEffectExecute(const FGameplayEffectModCallbackDa
         // Parry Check
         if (SFASC->HasMatchingGameplayTag(SFGameplayTags::Character_State_Parrying))
         {
-            SFASC->ProcessParryEvent(DamageDone, Data.EffectSpec);
+            USFAbilitySystemLibrary::SendParryEventFromSpec(SFASC, DamageDone, Data.EffectSpec);
             return;
         }
         
@@ -90,7 +89,7 @@ void USFPrimarySet::PostGameplayEffectExecute(const FGameplayEffectModCallbackDa
         
         if (NewHealth > 0)
         {
-            SFASC->ProcessHitReactionEvent(DamageDone, Data.EffectSpec);
+            USFAbilitySystemLibrary::SendHitReactionEventFromSpec(SFASC, DamageDone, Data.EffectSpec);
         }
         else 
         {
@@ -100,7 +99,7 @@ void USFPrimarySet::PostGameplayEffectExecute(const FGameplayEffectModCallbackDa
                 {
                     if (!SFASC->HasMatchingGameplayTag(SFGameplayTags::Character_State_Dead))
                     {
-                        SFASC->ProcessDeathEvent(Data.EffectSpec);
+                        HandleZeroHealth(SFASC, Data);
                     }
                 }
             }
@@ -136,6 +135,11 @@ void USFPrimarySet::PostAttributeChange(const FGameplayAttribute& Attribute, flo
         }
     }
     
+}
+
+void USFPrimarySet::HandleZeroHealth(USFAbilitySystemComponent* SFASC, const FGameplayEffectModCallbackData& Data)
+{
+    USFAbilitySystemLibrary::SendDeathEventFromSpec(SFASC, Data.EffectSpec);
 }
 
 void USFPrimarySet::ClampAttribute(const FGameplayAttribute& Attribute, float& NewValue) const

@@ -12,6 +12,7 @@
 #include "Character/SFPawnData.h"
 #include "Character/SFPawnExtensionComponent.h"
 #include "Character/Hero/SFHeroDefinition.h"
+#include "Components/SFPlayerCombatStateComponent.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
 #include "Messages/SFMessageGameplayTags.h"
 #include "Messages/SFPortalInfoMessages.h"
@@ -28,11 +29,24 @@ ASFPlayerState::ASFPlayerState(const FObjectInitializer& ObjectInitializer)
 	PrimarySet = CreateDefaultSubobject<USFPrimarySet_Hero>(TEXT("PrimarySet"));
 	CombatSet = CreateDefaultSubobject<USFCombatSet_Hero>(TEXT("CombatSet"));
 
-	//Upgrade
-	PermanentUpgradeComponent =
-		CreateDefaultSubobject<USFPermanentUpgradeComponent>(TEXT("PermanentUpgradeComponent"));
+	// Upgrade
+	PermanentUpgradeComponent = CreateDefaultSubobject<USFPermanentUpgradeComponent>(TEXT("PermanentUpgradeComponent"));
+
+	// CombatState
+	CombatStateComponent = CreateDefaultSubobject<USFPlayerCombatStateComponent>(TEXT("CombatStateComponent"));
 	
 	SetNetUpdateFrequency(100.f);
+}
+
+void ASFPlayerState::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (PawnDataHandle.IsValid())
+	{
+		PawnDataHandle->CancelHandle();
+		PawnDataHandle.Reset();
+	}
+
+	Super::EndPlay(EndPlayReason);
 }
 
 void ASFPlayerState::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
@@ -98,10 +112,15 @@ void ASFPlayerState::CopyProperties(APlayerState* PlayerState)
 	// Permanent Upgrade 데이터도 SeamlessTravel/InactivePlayer에 이어받도록 복사
 	NewPlayerState->PermanentUpgradeData = PermanentUpgradeData;
 	NewPlayerState->bPermanentUpgradeDataReceived = bPermanentUpgradeDataReceived;
-
+	
 	if (SavedASCData.IsValid())
 	{
 		NewPlayerState->SavedASCData = SavedASCData;
+	}
+
+	if (CombatStateComponent && NewPlayerState->CombatStateComponent)
+	{
+		NewPlayerState->CombatStateComponent->SetCombatInfoFromTravel(CombatStateComponent->GetCombatInfo());
 	}
 }
 
@@ -153,6 +172,15 @@ UAbilitySystemComponent* ASFPlayerState::GetAbilitySystemComponent() const
 	return AbilitySystemComponent;
 }
 
+bool ASFPlayerState::IsDead() const
+{
+	if (CombatStateComponent)
+	{
+		return CombatStateComponent->IsDead();
+	}
+	return false;
+}
+
 void ASFPlayerState::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
@@ -185,13 +213,18 @@ void ASFPlayerState::StartLoadingPawnData()
 		if (!PawnDataPath.IsNull())
 		{
 			UE_LOG(LogSF, Log, TEXT("Starting async load of PawnData for player %s"), *GetPlayerName());
+
+			TWeakObjectPtr<ASFPlayerState> WeakThis(this);
             
 			// 비동기 로드 시작
-			FStreamableDelegate OnLoaded = FStreamableDelegate::CreateLambda([this, PawnDataPath]()
+			FStreamableDelegate OnLoaded = FStreamableDelegate::CreateLambda([WeakThis, PawnDataPath]()
 			{
-				if (USFPawnData* LoadedPawnData = PawnDataPath.Get())
+				if (ASFPlayerState* StrongThis = WeakThis.Get())
 				{
-					OnPawnDataLoadComplete(LoadedPawnData);
+					if (USFPawnData* LoadedPawnData = PawnDataPath.Get())
+					{
+						StrongThis->OnPawnDataLoadComplete(LoadedPawnData);
+					}
 				}
 			});
 			PawnDataHandle = USFAssetManager::Get().LoadPawnDataAsync(PawnDataPath, OnLoaded);
@@ -220,8 +253,6 @@ void ASFPlayerState::OnPawnDataLoadComplete(const USFPawnData* LoadedPawnData)
 	// 델리게이트 브로드캐스트 - GameMode가 처리
 	OnPawnDataLoaded.Broadcast(LoadedPawnData);
 }
-
-
 
 void ASFPlayerState::SetPawnData(const USFPawnData* InPawnData)
 {

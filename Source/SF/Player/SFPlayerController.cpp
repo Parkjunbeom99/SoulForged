@@ -35,25 +35,6 @@ void ASFPlayerController::BeginPlay()
 		}
 	}
 
-	if (IsLocalController())
-	{
-		if (ASFGameState* SFGameState = GetWorld()->GetGameState<ASFGameState>())
-		{
-			if (USFStageManagerComponent* StageManager = SFGameState->GetStageManager())
-			{
-				// 이미 클리어된 상태면 즉시 처리
-				if (StageManager->IsStageCleared())
-				{
-					HandleStageCleared(StageManager->GetCurrentStageInfo());
-				}
-				else
-				{
-					StageManager->OnStageCleared.AddDynamic(this, &ThisClass::HandleStageCleared);
-				}
-			}
-		}
-	}
-
 	// 로컬 플레이어인 경우 팀원 표시 로직 실행
 	if (IsLocalController())
 	{
@@ -128,7 +109,6 @@ USFAbilitySystemComponent* ASFPlayerController::GetSFAbilitySystemComponent() co
 	const ASFPlayerState* LCPS = GetSFPlayerState();
 	return (LCPS ? LCPS->GetSFAbilitySystemComponent() : nullptr);
 }
-
 
 void ASFPlayerController::PostProcessInput(const float DeltaTime, const bool bGamePaused)
 {
@@ -242,104 +222,5 @@ void ASFPlayerController::CreateTeammateIndicators()
 			
 			UE_LOG(LogTemp, Log, TEXT("Team Indicator Created for: %s"), *Actor->GetName());
 		}
-
-		
-	}
-	
-	
-}
-
-void ASFPlayerController::HandleStageCleared(const FSFStageInfo& ClearedStageInfo)
-{
-	if (!ClearedStageInfo.IsBossStage() && !ClearedStageInfo.IsNormalStage())
-	{
-		return;
-	}
-
-	ASFPlayerState* SFPS = GetPlayerState<ASFPlayerState>();
-	if (!SFPS)
-	{
-		return;
-	}
-
-	if (!SFPS->IsPawnDataLoaded())
-	{
-		// 아직 로드 안됨 - 대기
-		bPendingStageCleared = true;
-		PendingStageInfo = ClearedStageInfo;
-
-		// 기존 핸들 해제 후 새로 바인딩
-		if (PawnDataLoadedHandle.IsValid())
-		{
-			SFPS->OnPawnDataLoaded.Remove(PawnDataLoadedHandle);
-		}
-  
-		// 로드 완료 대기
-		PawnDataLoadedHandle = SFPS->OnPawnDataLoaded.AddLambda([this](const USFPawnData* PawnData)
-		{
-			if (bPendingStageCleared)
-			{
-				bPendingStageCleared = false;
-				ShowSkillSelectionScreen(PendingStageInfo.StageIndex);
-			}
-		});
-			
-		return;
-	}
-	
-	ShowSkillSelectionScreen(ClearedStageInfo.StageIndex);
-}
-
-void ASFPlayerController::ShowSkillSelectionScreen(int32 StageIndex)
-{
-	if (SkillSelectionScreenInstance && SkillSelectionScreenInstance->IsInViewport())
-	{
-		return;
-	}
-
-	if (!SkillSelectionScreenClass)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[PlayerController] SkillSelectionScreenClass is not set!"));
-		return;
-	}
-
-	SkillSelectionScreenInstance = CreateWidget<USFSkillSelectionScreen>(this, SkillSelectionScreenClass);
-	if (SkillSelectionScreenInstance)
-	{
-		// 선택 완료 바인딩
-		SkillSelectionScreenInstance->OnSelectionCompleteDelegate.AddDynamic(this, &ThisClass::OnSkillSelectionComplete);
-
-		// 스테이지 정보로 초기화
-		SkillSelectionScreenInstance->InitializeSelection(StageIndex);
-
-		// 화면에 표시
-		SkillSelectionScreenInstance->AddToViewport(50);
-
-		// UI 모드로 전환
-		FInputModeUIOnly InputMode;
-		InputMode.SetWidgetToFocus(SkillSelectionScreenInstance->TakeWidget());
-		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-		SetInputMode(InputMode);
-		bShowMouseCursor = true;
-	}
-}
-
-void ASFPlayerController::OnSkillSelectionComplete()
-{
-	HideSkillSelectionScreen();
-}
-
-
-void ASFPlayerController::HideSkillSelectionScreen()
-{
-	if (SkillSelectionScreenInstance)
-	{
-		SkillSelectionScreenInstance->OnSelectionCompleteDelegate.RemoveAll(this);
-		SkillSelectionScreenInstance->RemoveFromParent();
-		SkillSelectionScreenInstance = nullptr;
-
-		// 게임 모드로 복귀
-		SetInputMode(FInputModeGameOnly());
-		bShowMouseCursor = false;
 	}
 }

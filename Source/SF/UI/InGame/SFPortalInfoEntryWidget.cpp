@@ -15,6 +15,9 @@ void USFPortalInfoEntryWidget::InitializeRow(ASFPlayerState* OwningPlayerState)
 
     // PlayerState의 bIsReadyForTravel 값을 읽어와 UI에 즉시 반영
     SetReadyStatus(OwningPlayerState->GetIsReadyForTravel());
+
+    // 초기 Dead 상태 반영 (Seamless Travel 후 이미 죽은 플레이어 처리)
+    SetDeadStatus(OwningPlayerState->IsDead());
     
     const FSFPlayerSelectionInfo& SelectionInfo = OwningPlayerState->GetPlayerSelection();
 
@@ -27,9 +30,39 @@ void USFPortalInfoEntryWidget::InitializeRow(ASFPlayerState* OwningPlayerState)
 
 void USFPortalInfoEntryWidget::SetReadyStatus(bool bIsReady)
 {
+    if (bIsPlayerDead)
+    {
+        bIsReady = false;
+    }
+    
     if (Img_ReadyCheck)
     {
         Img_ReadyCheck->SetVisibility(bIsReady? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+    }
+}
+
+void USFPortalInfoEntryWidget::SetDeadStatus(bool bIsDead)
+{
+    bIsPlayerDead = bIsDead;
+
+    if (bIsDead)
+    {
+        // Ready 체크 강제 숨김
+        SetReadyStatus(false);
+        
+        // 시각적 처리: Grayed out
+        if (Img_HeroIcon)
+        {
+            Img_HeroIcon->SetColorAndOpacity(FLinearColor(0.3f, 0.3f, 0.3f, 0.6f));
+        }
+    }
+    else
+    {
+        // 부활 시 복원
+        if (Img_HeroIcon)
+        {
+            Img_HeroIcon->SetColorAndOpacity(FLinearColor::White);
+        }
     }
 }
 

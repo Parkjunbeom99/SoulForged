@@ -1,7 +1,11 @@
 #include "SFPrimarySet_Hero.h"
 
+#include "GameplayEffectExtension.h"
 #include "AbilitySystem/SFAbilitySystemComponent.h"
+#include "Character/SFCharacterGameplayTags.h"
+#include "Libraries/SFAbilitySystemLibrary.h"
 #include "Net/UnrealNetwork.h"
+#include "Player/Components/SFPlayerCombatStateComponent.h"
 
 USFPrimarySet_Hero::USFPrimarySet_Hero()
 {
@@ -20,7 +24,21 @@ void USFPrimarySet_Hero::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 
 bool USFPrimarySet_Hero::PreGameplayEffectExecute(FGameplayEffectModCallbackData& Data)
 {
-	return Super::PreGameplayEffectExecute(Data);
+	if (!Super::PreGameplayEffectExecute(Data))
+	{
+		return false;
+	}
+
+	if (Data.EvaluatedData.Attribute == GetDamageAttribute())
+	{
+		USFAbilitySystemComponent* SFASC = GetSFAbilitySystemComponent();
+		if (SFASC && SFASC->HasMatchingGameplayTag(SFGameplayTags::Character_State_Downed))
+		{
+			return false;
+		}
+	}
+
+	return true;
 }
 
 void USFPrimarySet_Hero::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
@@ -64,6 +82,18 @@ void USFPrimarySet_Hero::PostAttributeChange(const FGameplayAttribute& Attribute
 	}
 }
 
+void USFPrimarySet_Hero::HandleZeroHealth(USFAbilitySystemComponent* SFASC, const FGameplayEffectModCallbackData& Data)
+{
+	if (CanEnterDownedState())
+	{
+		USFAbilitySystemLibrary::SendDownedEventFromSpec(SFASC, Data.EffectSpec);
+	}
+	else
+	{
+		Super::HandleZeroHealth(SFASC, Data);
+	}
+}
+
 void USFPrimarySet_Hero::ClampAttribute(const FGameplayAttribute& Attribute, float& NewValue) const
 {
 	Super::ClampAttribute(Attribute, NewValue);
@@ -104,4 +134,15 @@ void USFPrimarySet_Hero::OnRep_Stamina(const FGameplayAttributeData& OldValue)
 void USFPrimarySet_Hero::OnRep_MaxStamina(const FGameplayAttributeData& OldValue)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, MaxStamina, OldValue);
+}
+
+bool USFPrimarySet_Hero::CanEnterDownedState() const
+{
+	USFPlayerCombatStateComponent* CombatState = USFPlayerCombatStateComponent::FindPlayerCombatStateComponent(GetOwningActor());
+	if (!CombatState)
+	{
+		return false;
+	}
+
+	return CombatState->GetRemainingDownCount() > 0;
 }
