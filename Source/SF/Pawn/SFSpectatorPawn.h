@@ -18,6 +18,8 @@ public:
 	ASFSpectatorPawn(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
+	virtual FVector GetPawnViewLocation() const override;
+
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
@@ -38,11 +40,21 @@ protected:
 	UPROPERTY(Transient)
 	TWeakObjectPtr<AActor> FollowTarget;
 
-	// 위치 따라가기 속도
+	/** 스무딩된 타겟 위치 */
+	FVector SmoothedTargetLocation;
+    
+	/** 스무딩된 타겟 회전 */
+	FRotator SmoothedTargetRotation;
+
+	/** 타겟 위치 스무딩 속도 (네트워크 지터 흡수) */
+	UPROPERTY(EditDefaultsOnly, Category = "SF|Spectator")
+	float TargetSmoothingSpeed = 10.f;
+
+	/** SpectatorPawn 위치 따라가기 속도 */
 	UPROPERTY(EditDefaultsOnly, Category = "SF|Spectator")
 	float LocationFollowSpeed = 15.f;
 
-	// 회전 따라가기 속도
+	/** 회전 따라가기 속도 */
 	UPROPERTY(EditDefaultsOnly, Category = "SF|Spectator")
 	float RotationFollowSpeed = 10.f;
 };
