@@ -2,6 +2,7 @@
 
 #include "Character/SFPawnExtensionComponent.h"
 #include "Components/GameFrameworkComponentManager.h"
+#include "Player/SFPlayerState.h"
 #include "System/SFInitGameplayTags.h"
 
 
@@ -13,6 +14,18 @@ USFLoadingCheckComponent::USFLoadingCheckComponent(const FObjectInitializer& Obj
 
 bool USFLoadingCheckComponent::ShouldShowLoadingScreen(FString& OutReason) const
 {
+	// 죽은 플레이어는 Pawn 없이도 로딩 스크린 종료 허용
+	if (AController* Controller = GetController<AController>())
+	{
+		if (ASFPlayerState* SFPS = Controller->GetPlayerState<ASFPlayerState>())
+		{
+			if (SFPS->IsDead())
+			{
+				return false; 
+			}
+		}
+	}
+	
 	if (APawn* OwnedPawn = GetPawn<APawn>())
 	{
 		if (const USFPawnExtensionComponent* PawnExtComp = USFPawnExtensionComponent::FindPawnExtensionComponent(OwnedPawn))

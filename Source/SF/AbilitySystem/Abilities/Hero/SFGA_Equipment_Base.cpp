@@ -66,6 +66,11 @@ bool USFGA_Equipment_Base::CanActivateAbility(const FGameplayAbilitySpecHandle H
 	return true;
 }
 
+void USFGA_Equipment_Base::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
+{
+	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+}
+
 AActor* USFGA_Equipment_Base::GetEquippedActorBySlot(const FGameplayTag& SlotTag) const
 {
 	if (USFEquipmentComponent* EquipComp = GetEquipmentComponent())
@@ -75,25 +80,51 @@ AActor* USFGA_Equipment_Base::GetEquippedActorBySlot(const FGameplayTag& SlotTag
 	return nullptr;
 }
 
+USFEquipmentInstance* USFGA_Equipment_Base::GetEquipmentInstanceBySlot(const FGameplayTag& SlotTag) const
+{
+	if (USFEquipmentComponent* EquipComp = GetEquipmentComponent())
+	{
+		return EquipComp->FindEquipmentInstanceBySlot(SlotTag);
+	}
+	return nullptr;
+}
+
+USFEquipmentDefinition* USFGA_Equipment_Base::GetEquipmentDefinitionBySlot(const FGameplayTag& SlotTag) const
+{
+	if (USFEquipmentInstance* Instance = GetEquipmentInstanceBySlot(SlotTag))
+	{
+		return Instance->GetEquipmentDefinition();
+	}
+	return nullptr;
+}
+
 AActor* USFGA_Equipment_Base::GetMainHandWeaponActor() const
 {
 	return GetEquippedActorBySlot(SFGameplayTags::EquipmentSlot_MainHand);
 }
 
-USFEquipmentComponent* USFGA_Equipment_Base::GetEquipmentComponent() const
+USFEquipmentInstance* USFGA_Equipment_Base::GetMainHandEquipmentInstance() const
 {
-	if (AActor* AvatarActor = GetAvatarActorFromActorInfo())
-	{
-		return USFEquipmentComponent::FindEquipmentComponent(AvatarActor);
-	}
-	return nullptr;
+	return GetEquipmentInstanceBySlot(SFGameplayTags::EquipmentSlot_MainHand);
 }
 
-
-void USFGA_Equipment_Base::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
+USFEquipmentDefinition* USFGA_Equipment_Base::GetMainHandEquipmentDefinition() const
 {
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-	
+	return GetEquipmentDefinitionBySlot(SFGameplayTags::EquipmentSlot_MainHand);
+}
+
+const FSFWeaponWarpSettings* USFGA_Equipment_Base::GetMainHandWarpSettings() const
+{
+	return GetWarpSettingsBySlot(SFGameplayTags::EquipmentSlot_MainHand);
+}
+
+const FSFWeaponWarpSettings* USFGA_Equipment_Base::GetWarpSettingsBySlot(const FGameplayTag& SlotTag) const
+{
+	if (USFEquipmentDefinition* Definition = GetEquipmentDefinitionBySlot(SlotTag))
+	{
+		return &Definition->WarpSettings;
+	}
+	return nullptr;
 }
 
 void USFGA_Equipment_Base::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)

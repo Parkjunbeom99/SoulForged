@@ -26,7 +26,7 @@ public:
 
 	USFHeroComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
-	UFUNCTION(BlueprintPure, Category = "LC|Hero")
+	UFUNCTION(BlueprintPure, Category = "SF|Hero")
 	static USFHeroComponent* FindHeroComponent(const AActor* Actor) { return (Actor ? Actor->FindComponentByClass<USFHeroComponent>() : nullptr); }
 	
 	/** Overrides the camera from an active gameplay ability */
@@ -67,6 +67,7 @@ protected:
 	void Input_AbilityInputTagReleased(FGameplayTag InputTag);
 	
 	void Input_Move(const FInputActionValue& InputActionValue);
+	void Input_MoveCompleted(const FInputActionValue& InputActionValue);
 	void Input_LookMouse(const FInputActionValue& InputActionValue);
 	void Input_Crouch(const FInputActionValue& InputActionValue);
 

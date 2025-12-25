@@ -20,8 +20,8 @@ namespace SFGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(GameplayEvent_Knockback, "GameplayEvent.Knockback");
 	UE_DEFINE_GAMEPLAY_TAG(GameplayEvent_Launched, "GameplayEvent.Launched");
 	UE_DEFINE_GAMEPLAY_TAG(GameplayEvent_Groggy, "GameplayEvent.Groggy");
-	
-	
+	UE_DEFINE_GAMEPLAY_TAG(GameplayEvent_Revived, "GameplayEvent.Revived");
+	UE_DEFINE_GAMEPLAY_TAG(GameplayEvent_Downed, "GameplayEvent.Downed");
 
 	// Damage Events
 	UE_DEFINE_GAMEPLAY_TAG(GameplayEvent_Damage_Critical, "GameplayEvent.Damage.Critical");

@@ -6,6 +6,7 @@
 #include "Net/UnrealNetwork.h"
 #include "System/SFGameInstance.h"
 #include "Character/Enemy/SFEnemy.h"
+#include "Libraries/SFAbilitySystemLibrary.h"
 
 USFPrimarySet_Enemy::USFPrimarySet_Enemy()
 {
@@ -61,7 +62,7 @@ void USFPrimarySet_Enemy::PostGameplayEffectExecute(const FGameplayEffectModCall
 				USFAbilitySystemComponent* SFASC = GetSFAbilitySystemComponent();
 				if (SFASC)
 				{
-					SFASC->ProcessStaggerEvent(Data.EffectSpec);
+					USFAbilitySystemLibrary::SendStaggerEventFromSpec(SFASC, Data.EffectSpec);
 				}
 			}
 		}

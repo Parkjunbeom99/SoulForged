@@ -69,23 +69,26 @@ void ASFEnemyController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus St
 {
     if (!Actor) return;
 
+    // 시야(Sight) 감각인지 확인
     if (!Stimulus.Type.IsValid() || Stimulus.Type != UAISense::GetSenseID<UAISense_Sight>())
         return;
 
+    // 타겟 태그 확인
     if (!TargetTag.IsNone() && !Actor->ActorHasTag(TargetTag))
         return;
 
-    //  CombatComponent에게 시야 감지 결과 전달
+    // CombatComponent에게 알림
     if (CombatComponent)
     {
         CombatComponent->HandleTargetPerceptionUpdated(Actor, Stimulus.WasSuccessfullySensed());
     }
 
-    // 감지 성공
+    // 감지 성공 시
     if (Stimulus.WasSuccessfullySensed())
     {
         TargetActor = Actor;
 
+        // 전투 상태가 아니었다면 전환
         if (!bIsInCombat)
         {
             bIsInCombat = true;
@@ -98,7 +101,6 @@ void ASFEnemyController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus St
 
         if (CachedBlackboardComponent)
         {
-            // 타겟을 발견했으므로 블랙보드 갱신 (추격 시작)
             CachedBlackboardComponent->SetValueAsObject("TargetActor", Actor);
             CachedBlackboardComponent->SetValueAsBool("bHasTarget", true);
             CachedBlackboardComponent->SetValueAsBool("bIsInCombat", true);

@@ -3,9 +3,15 @@
 #include "CoreMinimal.h"
 #include "GenericTeamAgentInterface.h"
 #include "Abilities/GameplayAbility.h"
+#include "Animation/Hero/SFHeroAnimationData.h"
 #include "Character/Hero/Component/SFHeroMovementComponent.h"
 #include "SFGameplayAbility.generated.h"
 
+class ASFPlayerState;
+class UInputAction;
+class USFEquipmentComponent;
+class USFHeroAnimationData;
+class USFPawnExtensionComponent;
 class ASFPlayerController;
 class USFHeroComponent;
 class USFCameraMode;
@@ -39,6 +45,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "SF|Ability")
 	ASFPlayerController* GetSFPlayerControllerFromActorInfo() const;
+
+	UFUNCTION(BlueprintPure, Category = "SF|Ability")
+	ASFPlayerState* GetSFPlayerStateFromActorInfo() const;
 	
 	UFUNCTION(BlueprintCallable, Category = "SF|Ability")
 	ASFCharacterBase* GetSFCharacterFromActorInfo() const;
@@ -48,6 +57,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "SF|Ability")
 	USFHeroComponent* GetHeroComponentFromActorInfo() const;
+
+	UFUNCTION(BlueprintCallable, Category = "SF|Ability|Animation")
+	USFHeroAnimationData* GetHeroAnimationData() const;
+
+	UFUNCTION(BlueprintCallable, Category = "SF|Ability|Equipment")
+	USFEquipmentComponent* GetEquipmentComponent() const;
+
+	UFUNCTION(BlueprintCallable, Category = "SF|Ability|Equipment")
+	FSFMontagePlayData GetMainHandEquipMontageData() const;
 	
 	ESFAbilityActivationPolicy GetActivationPolicy() const { return ActivationPolicy; }
 
@@ -78,6 +96,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "SF|Ability|Movement")
 	void RestoreSlidingMode();
+
+	UFUNCTION(BlueprintCallable)
+	void FlushPressedInput(UInputAction* InputAction);
+
+	UFUNCTION(BlueprintCallable, Category = "SF|Ability|Animation")
+	void ExecuteMontageGameplayCue(const FSFMontagePlayData& MontageData);
 	
 protected:
 	//~UGameplayAbility interface
