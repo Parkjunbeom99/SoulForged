@@ -33,6 +33,8 @@ ASFPlayerState::ASFPlayerState(const FObjectInitializer& ObjectInitializer)
 		CreateDefaultSubobject<USFPermanentUpgradeComponent>(TEXT("PermanentUpgradeComponent"));
 	
 	SetNetUpdateFrequency(100.f);
+
+
 }
 
 void ASFPlayerState::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const

@@ -76,14 +76,18 @@ void UBTService_UpdateTarget::TickNode(UBehaviorTreeComponent& OwnerComp, uint8*
 		
 		if (Dist > MaxChaseDistance)
 		{
-
-
 			BlackboardComp->ClearValue(TargetActorKey.SelectedKeyName);
 			BlackboardComp->SetValueAsBool(HasTargetKey.SelectedKeyName, false);
 			AIController->TargetActor = nullptr;
-			
+
+			// ✅ CombatComponent도 클리어
+			if (AIController->CombatComponent && CurrentTarget)
+			{
+				AIController->CombatComponent->HandleTargetPerceptionUpdated(CurrentTarget, false);
+			}
+
 			// 타겟을 지웠으니 이번 틱 종료
-			return; 
+			return;
 		}
 		
 	}
@@ -150,12 +154,18 @@ void UBTService_UpdateTarget::TickNode(UBehaviorTreeComponent& OwnerComp, uint8*
 		{
 
 			CurrentTarget = BestTarget; // 로컬 변수 갱신
-			
+
 			// 블랙보드 및 컨트롤러 갱신
 			BlackboardComp->SetValueAsObject(TargetActorKey.SelectedKeyName, CurrentTarget);
 			BlackboardComp->SetValueAsBool(HasTargetKey.SelectedKeyName, true);
 			AIController->TargetActor = CurrentTarget;
-			
+
+			// ✅ CombatComponent도 업데이트 (UpdateDesiredControlYaw가 올바른 타겟 사용)
+			if (AIController->CombatComponent)
+			{
+				AIController->CombatComponent->HandleTargetPerceptionUpdated(CurrentTarget, true);
+			}
+
 			// [중요] 타겟을 새로 찾았을 때만 LastKnownPosition 업데이트 (추격용)
 			// 시야에서 사라져도 마지막 위치로 가게 하려면 이 부분이 중요함
 			BlackboardComp->SetValueAsVector("LastKnownPosition", CurrentTarget->GetActorLocation());
@@ -176,6 +186,13 @@ void UBTService_UpdateTarget::TickNode(UBehaviorTreeComponent& OwnerComp, uint8*
 			BlackboardComp->ClearValue(TargetActorKey.SelectedKeyName);
 			BlackboardComp->SetValueAsBool(HasTargetKey.SelectedKeyName, false);
 			AIController->TargetActor = nullptr;
+
+			// ✅ CombatComponent도 클리어
+			if (AIController->CombatComponent && CurrentTarget)
+			{
+				AIController->CombatComponent->HandleTargetPerceptionUpdated(CurrentTarget, false);
+			}
+
 			return;
 		}
 	}
