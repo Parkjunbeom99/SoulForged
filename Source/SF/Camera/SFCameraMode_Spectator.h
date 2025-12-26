@@ -15,10 +15,19 @@ class SF_API USFCameraMode_Spectator : public USFCameraMode_ThirdPerson
 {
 	GENERATED_BODY()
 
-public:
-	USFCameraMode_Spectator();
-
 protected:
-	// 벽 뚫림 방지 로직 재정의
+	virtual void OnActivation() override;
+	virtual void UpdateView(float DeltaTime) override;
 	virtual void UpdatePreventPenetration(float DeltaTime) override;
+
+private:
+	AActor* GetFollowTarget() const;
+	FVector GetFollowTargetPivotLocation() const;
+	FRotator GetFollowTargetPivotRotation() const;
+
+	/** 관전 전용 보간된 피벗 위치 (FollowTarget 기준) */
+	FVector SmoothedFollowTargetPivot;
+	
+	/** 관전 전용 보간된 피벗 회전 */
+	FRotator SmoothedFollowTargetRotation;
 };
