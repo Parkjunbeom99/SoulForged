@@ -3,9 +3,12 @@
 #include "CoreMinimal.h"
 #include "Components/ControllerComponent.h"
 #include "Components/GameFrameworkInitStateInterface.h"
+#include "GameFramework/GameplayMessageSubsystem.h"
 #include "SFDeathUIComponent.generated.h"
 
 
+class UGameOverScreenWidget;
+struct FSFGameOverMessage;
 class USFPlayerCombatStateComponent;
 struct FSFHeroCombatInfo;
 class USFDeathScreenWidget;
@@ -47,6 +50,11 @@ protected:
 	void ShowDeathScreen();
 	void HideDeathScreen();
 
+	void OnGameOver(FGameplayTag Channel, const FSFGameOverMessage& Message);
+	void ShowGameOverScreen();
+
+	bool AreAllOtherPlayersIncapacitated();
+
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<USFDeathScreenWidget> DeathScreenWidgetClass;
@@ -54,13 +62,26 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	int32 DeathScreenZOrder = 100;
 
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UGameOverScreenWidget> GameOverWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	int32 GameOverScreenZOrder = 500;
+
 private:
 	UPROPERTY()
 	TObjectPtr<USFDeathScreenWidget> DeathScreenWidget;
+
+	UPROPERTY()
+	TObjectPtr<UGameOverScreenWidget> GameOverWidget;
 
 	UPROPERTY()
 	TWeakObjectPtr<USFPlayerCombatStateComponent> CachedCombatComp;
 
 	// 마지막으로 처리한 사망 상태 (중복 호출 방지)
 	bool bLastKnownDeadState = false;
+
+	bool bIsGameOver = false;
+
+	FGameplayMessageListenerHandle GameOverListenerHandle;
 };

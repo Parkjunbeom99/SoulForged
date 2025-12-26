@@ -55,7 +55,7 @@ void USFPortalInfoWidget::NativeConstruct()
 
     // Dead 상태 변경 리스너 등록
     DeadStateListenerHandle = MessageSubsystem.RegisterListener(
-        SFGameplayTags::Message_Player_DeadStateChanged,
+        SFGameplayTags::Message_Player_DeadStateChangedUI,
         this,
         &USFPortalInfoWidget::HandlePlayerDeadStateChanged);
 }

@@ -2,9 +2,14 @@
 
 #include "SFSpectatorComponent.h"
 #include "Components/GameFrameworkComponentDelegates.h"
+#include "GameFramework/GameplayMessageSubsystem.h"
+#include "GameFramework/GameStateBase.h"
+#include "Messages/SFMessageGameplayTags.h"
 #include "Player/SFPlayerState.h"
 #include "System/SFInitGameplayTags.h"
+#include "UI/InGame/GameOverScreenWidget.h"
 #include "UI/InGame/SFDeathScreenWidget.h"
+#include "Messages/SFPortalInfoMessages.h"
 
 const FName USFDeathUIComponent::NAME_DeathUIFeature("DeathUI");
 
@@ -31,6 +36,12 @@ void USFDeathUIComponent::BeginPlay()
 		return;
 	}
 
+	if (UGameplayMessageSubsystem::HasInstance(this))
+	{
+		UGameplayMessageSubsystem& MessageSubsystem = UGameplayMessageSubsystem::Get(this);
+		GameOverListenerHandle = MessageSubsystem.RegisterListener(SFGameplayTags::Message_Game_GameOver,this, &ThisClass::OnGameOver);
+	}
+
 	// 초기 상태(Spawned) 진입 시도
 	ensure(TryToChangeInitState(SFGameplayTags::InitState_Spawned));
     
@@ -40,6 +51,11 @@ void USFDeathUIComponent::BeginPlay()
 
 void USFDeathUIComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (UGameplayMessageSubsystem::HasInstance(this))
+	{
+		UGameplayMessageSubsystem::Get(this).UnregisterListener(GameOverListenerHandle);
+	}
+	
 	if (USFPlayerCombatStateComponent* CombatComp = CachedCombatComp.Get())
 	{
 		CombatComp->OnCombatInfoChanged.RemoveDynamic(this, &ThisClass::OnCombatInfoChanged);
@@ -205,6 +221,16 @@ void USFDeathUIComponent::OnCombatInfoChanged(const FSFHeroCombatInfo& CombatInf
 
 void USFDeathUIComponent::ShowDeathScreen()
 {
+	if (bIsGameOver)
+	{
+		return; // GameOver 이벤트가 곧 오므로 스킵
+	}
+
+	if (AreAllOtherPlayersIncapacitated())
+	{
+		return; // GameOver 이벤트가 곧 오므로 스킵
+	}
+	
 	APlayerController* PC = GetController<APlayerController>();
 	if (!PC || !DeathScreenWidgetClass)
 	{
@@ -247,11 +273,16 @@ void USFDeathUIComponent::HideDeathScreen()
 
 void USFDeathUIComponent::OnDeathAnimationFinished()
 {
+	if (bIsGameOver)
+	{
+		return; // GameOver 위젯을 스킵했으므로(애니메이션 출력중이라) 스크린 유지 필요
+	}
+	
 	if (DeathScreenWidget && DeathScreenWidget->IsInViewport())
 	{
 		DeathScreenWidget->RemoveFromParent();
 	}
-
+	
 	if (USFPlayerCombatStateComponent* CombatComp = CachedCombatComp.Get())
 	{
 		if (!CombatComp->IsDead())
@@ -269,4 +300,69 @@ void USFDeathUIComponent::OnDeathAnimationFinished()
 			SpectatorComp->StartSpectating();
 		}
 	}
+}
+
+void USFDeathUIComponent::OnGameOver(FGameplayTag Channel, const FSFGameOverMessage& Message)
+{
+	bIsGameOver = true;
+	
+	ShowGameOverScreen();
+}
+
+void USFDeathUIComponent::ShowGameOverScreen()
+{
+	APlayerController* PC = GetController<APlayerController>();
+	if (!PC || !GameOverWidgetClass)
+	{
+		return;
+	}
+
+	// DeathScreen이 이미 표시 중이면 유지
+	if (DeathScreenWidget && DeathScreenWidget->IsInViewport())
+	{
+		return;
+	}
+
+	// GameOver 화면 표시 (관전 중이던 플레이어들)
+	if (!GameOverWidget)
+	{
+		GameOverWidget = CreateWidget<UGameOverScreenWidget>(PC, GameOverWidgetClass);
+	}
+
+	if (GameOverWidget && !GameOverWidget->IsInViewport())
+	{
+		GameOverWidget->AddToViewport(GameOverScreenZOrder);
+		GameOverWidget->PlayGameOverDirection();
+	}
+}
+
+bool USFDeathUIComponent::AreAllOtherPlayersIncapacitated()
+{
+	AGameStateBase* GameState = GetWorld()->GetGameState<AGameStateBase>();
+	if (!GameState)
+	{
+		return false;
+	}
+
+	APlayerController* MyPC = GetController<APlayerController>();
+	if (!MyPC)
+	{
+		return false;
+	}
+
+	for (APlayerState* PS : GameState->PlayerArray)
+	{
+		if (PS->IsInactive() || PS == MyPC->PlayerState)
+		{
+			continue;
+		}
+
+		const USFPlayerCombatStateComponent* CombatComp = PS->FindComponentByClass<USFPlayerCombatStateComponent>();
+		if (CombatComp && !CombatComp->IsIncapacitated())
+		{
+			return false; // 다른 생존자 있음
+		}
+	}
+
+	return true; // 나만 남음
 }

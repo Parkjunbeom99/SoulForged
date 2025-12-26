@@ -64,6 +64,9 @@ protected:
 
 	bool IsBossStage() const;
 
+	UFUNCTION()
+	void OnGameOver();
+
 private:
 	void SetupPlayerPawnDataLoading(APlayerController* PC);
 	void OnPlayerPawnDataLoaded(APlayerController* PC, const USFPawnData* PawnData);
