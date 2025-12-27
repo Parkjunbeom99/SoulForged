@@ -34,11 +34,7 @@ protected:
 	/** SFGameState->OnPlayerRemoved 델리게이트에 연결될 함수 */
 	UFUNCTION()
 	void HandlePlayerRemoved(APlayerState* PlayerState);
-
-	bool CreateEntryForPlayer(APlayerState* PlayerState);
-
-	void RefreshEntryOrder();
-
+	
 	/** PortalManager의 글로벌 Portal State GMS 메시지를 처리 (UI 표시/숨김/카운트다운) */
 	void HandlePortalInfoChanged(FGameplayTag Channel, const FSFPortalStateMessage& Message);
 
@@ -49,6 +45,8 @@ protected:
 	void HandlePlayerDeadStateChanged(FGameplayTag Channel, const FSFPlayerDeadStateMessage& Message);
 
 	void UpdateCountdownText();
+
+	int32 FindInsertIndexForPlayer(int32 NewPlayerId);
 
 private:
 	

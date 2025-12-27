@@ -31,13 +31,17 @@ void USFPortalInfoWidget::NativeConstruct()
         SFGameState->OnPlayerAdded.AddDynamic(this, &USFPortalInfoWidget::HandlePlayerAdded);
         SFGameState->OnPlayerRemoved.AddDynamic(this, &USFPortalInfoWidget::HandlePlayerRemoved);
 
-        // 이미 접속해 있는 플레이어 Entry 등록
-        for (APlayerState* PS : SFGameState->PlayerArray)
+        TArray<APlayerState*> SortedPlayers = SFGameState->PlayerArray;
+        SortedPlayers.Sort([](const APlayerState& A, const APlayerState& B)
         {
-            CreateEntryForPlayer(PS);
-        }
+            return A.GetPlayerId() < B.GetPlayerId();
+        });
 
-        RefreshEntryOrder();
+        // 정렬된 순서대로 Entry 생성
+        for (APlayerState* PS : SortedPlayers)
+        {
+            HandlePlayerAdded(PS);
+        }
     }
 
     // GMS 리스너 등록
@@ -103,91 +107,62 @@ void USFPortalInfoWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaT
 
 void USFPortalInfoWidget::HandlePlayerAdded(APlayerState* PlayerState)
 {
-    if (CreateEntryForPlayer(PlayerState))
-    {
-        RefreshEntryOrder();
-    }
-}
-
-void USFPortalInfoWidget::HandlePlayerRemoved(APlayerState* PlayerState)
-{
-    if (!PlayerState || !PortalEntryMap.Contains(PlayerState))
-    {
-        return;
-    }
-
-    USFPortalInfoEntryWidget* EntryToRemove = PortalEntryMap.FindRef(PlayerState);
-    
-    // PortalEntryBox에서 Entry 제거
-    if (EntryToRemove)
-    {
-        EntryToRemove->RemoveFromParent();
-        PortalEntryMap.Remove(PlayerState);
-    }
-}
-
-bool USFPortalInfoWidget::CreateEntryForPlayer(APlayerState* PlayerState)
-{
     if (!PlayerState || PortalEntryMap.Contains(PlayerState))
     {
-        return false;
+        return;
     }
 
     if (!PortalEntryClass)
     {
         UE_LOG(LogSF, Warning, TEXT("USFPortalInfoWidget: PortalEntryClass is not set."));
-        return false;
+        return;
     }
 
     ASFPlayerState* SFPlayerState = Cast<ASFPlayerState>(PlayerState);
     if (!SFPlayerState)
     {
-        return false;
+        return;
     }
 
     USFPortalInfoEntryWidget* NewPortalEntry = CreateWidget<USFPortalInfoEntryWidget>(this, PortalEntryClass);
     if (NewPortalEntry)
     {
-        NewPortalEntry->InitializeRow(SFPlayerState); 
+        // Entry 위젯에 플레이어별 초기화 (닉네임, 아이콘, 초기 준비상태)
+        NewPortalEntry->InitializeRow(SFPlayerState);
+        
+        // PlayerId 기준 올바른 위치에 삽입 
+        int32 InsertIndex = FindInsertIndexForPlayer(SFPlayerState->GetPlayerId());
+        PortalEntryBox->InsertChildAt(InsertIndex, NewPortalEntry);
+        
         PortalEntryMap.Add(PlayerState, NewPortalEntry);
-        return true;
     }
-    
-    return false;
 }
 
-
-void USFPortalInfoWidget::RefreshEntryOrder()
+void USFPortalInfoWidget::HandlePlayerRemoved(APlayerState* PlayerState)
 {
-    if (!PortalEntryBox)
+    if (!PlayerState)
     {
         return;
     }
 
-    TArray<TPair<APlayerState*, USFPortalInfoEntryWidget*>> SortedEntries;
-    for (auto& Elem : PortalEntryMap)
+    // TWeakObjectPtr 키로 찾기
+    USFPortalInfoEntryWidget* EntryToRemove = nullptr;
+    TWeakObjectPtr<APlayerState> KeyToRemove;
+    
+    for (auto& Pair : PortalEntryMap)
     {
-        APlayerState* PS = Elem.Key.Get();    // TObjectPtr → raw pointer 자동 변환
-        USFPortalInfoEntryWidget* Widget = Elem.Value;
-        
-        if (PS && Widget)
+        if (Pair.Key.Get() == PlayerState)
         {
-            SortedEntries.Emplace(PS, Widget);
+            EntryToRemove = Pair.Value;
+            KeyToRemove = Pair.Key;
+            break;
         }
     }
-
-    // PlayerId 기준 정렬
-    SortedEntries.Sort([](const TPair<APlayerState*, USFPortalInfoEntryWidget*>& A, const TPair<APlayerState*, USFPortalInfoEntryWidget*>& B)
+    
+    if (EntryToRemove)
     {
-        return A.Key->GetPlayerId() < B.Key->GetPlayerId();
-    });
-
-    PortalEntryBox->ClearChildren();
-
-    // 정렬된 순서로 다시 추가
-    for (const auto& Entry : SortedEntries)
-    {
-        PortalEntryBox->AddChild(Entry.Value);
+        EntryToRemove->RemoveFromParent();
+        PortalEntryMap.Remove(KeyToRemove);
     }
 }
 
@@ -250,4 +225,32 @@ void USFPortalInfoWidget::UpdateCountdownText()
         int32 DisplayTime = FMath::CeilToInt(CurrentCountdownTime);
         Text_Countdown->SetText(FText::AsNumber(DisplayTime));
     }
+}
+
+int32 USFPortalInfoWidget::FindInsertIndexForPlayer(int32 NewPlayerId)
+{
+    // 현재 자식들 중에서 NewPlayerId보다 큰 첫 번째 위치 찾기
+    for (int32 i = 0; i < PortalEntryBox->GetChildrenCount(); ++i)
+    {
+        UWidget* ChildWidget = PortalEntryBox->GetChildAt(i);
+        
+        // Map에서 해당 위젯의 PlayerState 찾기
+        for (const auto& Pair : PortalEntryMap)
+        {
+            if (Pair.Value == ChildWidget)
+            {
+                if (APlayerState* PS = Pair.Key.Get())
+                {
+                    if (PS->GetPlayerId() > NewPlayerId)
+                    {
+                        return i;  // 이 위치 앞에 삽입
+                    }
+                }
+                break;
+            }
+        }
+    }
+    
+    // 가장 큰 PlayerId이면 맨 뒤에 추가
+    return PortalEntryBox->GetChildrenCount();
 }

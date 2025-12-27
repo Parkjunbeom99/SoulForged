@@ -1,5 +1,6 @@
 #include "SFPortalInfoEntryWidget.h"
 
+#include "SFLogChannels.h"
 #include "Player/SFPlayerState.h" 
 #include "Character/Hero/SFHeroDefinition.h" 
 #include "Components/Image.h"
@@ -15,11 +16,6 @@ void USFPortalInfoEntryWidget::InitializeRow(ASFPlayerState* OwningPlayerState)
 
     CachedPlayerState = OwningPlayerState;
 
-    if (!OwningPlayerState->OnPlayerInfoChanged.IsAlreadyBound(this, &USFPortalInfoEntryWidget::HandlePlayerInfoChanged))
-    {
-        OwningPlayerState->OnPlayerInfoChanged.AddDynamic(this, &USFPortalInfoEntryWidget::HandlePlayerInfoChanged);
-    }
-
     // PlayerState의 bIsReadyForTravel 값을 읽어와 UI에 즉시 반영
     SetReadyStatus(OwningPlayerState->GetIsReadyForTravel());
 
@@ -28,10 +24,12 @@ void USFPortalInfoEntryWidget::InitializeRow(ASFPlayerState* OwningPlayerState)
     
     const FSFPlayerSelectionInfo& SelectionInfo = OwningPlayerState->GetPlayerSelection();
 
-    if (SelectionInfo.GetHeroDefinition() != nullptr)
-    {
-        HandlePlayerInfoChanged(SelectionInfo);
-    }
+    // PlayerState의 PlayerInfo를 읽어와 UI에 즉시 반영
+    HandlePlayerInfoChanged(SelectionInfo);
+
+    // Replicated PlayerInfo 변경 시 UI 업데이트를 위한 델리게이트 등록
+    OwningPlayerState->OnPlayerInfoChanged.AddDynamic(this, &USFPortalInfoEntryWidget::HandlePlayerInfoChanged);
+    
 }
 
 void USFPortalInfoEntryWidget::SetReadyStatus(bool bIsReady)
@@ -76,6 +74,12 @@ void USFPortalInfoEntryWidget::NativeDestruct()
 {
     // 위젯이 파괴될 때 (스테이지 이동 or 플레이어가 중간에 이탈)
     // 아직 로드 중인 아이콘이 있다면 로드를 취소 (크래시 방지)
+
+    if (ASFPlayerState* SFPS = CachedPlayerState.Get())
+    {
+        SFPS->OnPlayerInfoChanged.RemoveDynamic(this, &USFPortalInfoEntryWidget::HandlePlayerInfoChanged);
+    }
+    
     if (IconLoadHandle.IsValid())
     {
         IconLoadHandle->CancelHandle();
@@ -87,15 +91,15 @@ void USFPortalInfoEntryWidget::NativeDestruct()
 
 void USFPortalInfoEntryWidget::HandlePlayerInfoChanged(const FSFPlayerSelectionInfo& NewPlayerSelection)
 {
+    if (Text_PlayerName)
+    {
+        Text_PlayerName->SetText(FText::FromString(NewPlayerSelection.GetPlayerNickname()));
+    }
+    
     USFHeroDefinition* HeroDef = NewPlayerSelection.GetHeroDefinition();
     if (!HeroDef)
     {
         return;
-    }
-    
-    if (Text_PlayerName)
-    {
-        Text_PlayerName->SetText(FText::FromString(NewPlayerSelection.GetPlayerNickname()));
     }
     
     const TSoftObjectPtr<UTexture2D> IconPath = HeroDef->GetIconPath(); 

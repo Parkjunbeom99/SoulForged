@@ -49,7 +49,6 @@ protected:
 	TObjectPtr<UImage> Img_ReadyCheck;
 
 private:
-	UPROPERTY()
 	TWeakObjectPtr<ASFPlayerState> CachedPlayerState;
 	
 	/** Hero 아이콘의 비동기 로드를 관리하는 핸들 */
