@@ -48,7 +48,13 @@ protected:
 	void OnDeathAnimationFinished();
 
 	void ShowDeathScreen();
-	void HideDeathScreen();
+
+	void OnResurrected();
+	void BindToNewPawnInitState();
+	void OnNewPawnGameplayReady(const FActorInitStateChangedParams& Params);
+
+	UFUNCTION()
+	void OnPossessedPawnChanged(APawn* OldPawn, APawn* NewPawn);
 
 	void OnGameOver(FGameplayTag Channel, const FSFGameOverMessage& Message);
 	void ShowGameOverScreen();
@@ -84,4 +90,6 @@ private:
 	bool bIsGameOver = false;
 
 	FGameplayMessageListenerHandle GameOverListenerHandle;
+
+	FDelegateHandle PawnInitStateHandle;
 };

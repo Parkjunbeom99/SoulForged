@@ -1,7 +1,10 @@
 #include "SFDeathUIComponent.h"
 
 #include "SFSpectatorComponent.h"
+#include "Character/SFPawnExtensionComponent.h"
+#include "Character/Hero/SFHero.h"
 #include "Components/GameFrameworkComponentDelegates.h"
+#include "Components/GameFrameworkComponentManager.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
 #include "GameFramework/GameStateBase.h"
 #include "Messages/SFMessageGameplayTags.h"
@@ -9,7 +12,6 @@
 #include "System/SFInitGameplayTags.h"
 #include "UI/InGame/GameOverScreenWidget.h"
 #include "UI/InGame/SFDeathScreenWidget.h"
-#include "Messages/SFPortalInfoMessages.h"
 
 const FName USFDeathUIComponent::NAME_DeathUIFeature("DeathUI");
 
@@ -215,7 +217,7 @@ void USFDeathUIComponent::OnCombatInfoChanged(const FSFHeroCombatInfo& CombatInf
 	else
 	{
 		// 부활
-		HideDeathScreen();
+		OnResurrected();
 	}
 }
 
@@ -250,8 +252,75 @@ void USFDeathUIComponent::ShowDeathScreen()
 	}
 }
 
-void USFDeathUIComponent::HideDeathScreen()
+void USFDeathUIComponent::OnResurrected()
 {
+	APlayerController* PC = GetController<APlayerController>();
+	if (!PC)
+	{
+		return;
+	}
+
+	// DeathScreen만 제거
+	if (DeathScreenWidget && DeathScreenWidget->IsInViewport())
+	{
+		DeathScreenWidget->RemoveFromParent();
+	}
+
+	// 새 Pawn의 InitState 바인딩
+	BindToNewPawnInitState();
+}
+
+void USFDeathUIComponent::BindToNewPawnInitState()
+{
+	APlayerController* PC = GetController<APlayerController>();
+	if (!PC)
+	{
+		return;
+	}
+
+	APawn* CurrentPawn = PC->GetPawn();
+    
+	// 아직 새 Pawn이 없거나 SpectatorPawn이면 OnPossessedPawnChanged로 대기
+	if (!CurrentPawn || !CurrentPawn->IsA(ASFHero::StaticClass()))
+	{
+		// Pawn 변경 시 다시 시도
+		if (!PC->OnPossessedPawnChanged.IsAlreadyBound(this, &ThisClass::OnPossessedPawnChanged))
+		{
+			PC->OnPossessedPawnChanged.AddDynamic(this, &ThisClass::OnPossessedPawnChanged);
+		}
+		return;
+	}
+
+	// 새 Hero Pawn이 있으면 InitState 바인딩
+	if (UGameFrameworkComponentManager* Manager = UGameFrameworkComponentManager::GetForActor(CurrentPawn))
+	{
+		// 이미 GameplayReady면 즉시 콜백, 아니면 도달 시 콜백
+		PawnInitStateHandle = Manager->RegisterAndCallForActorInitState(CurrentPawn, USFPawnExtensionComponent::NAME_ActorFeatureName, SFGameplayTags::InitState_GameplayReady,
+			FActorInitStateChangedDelegate::CreateUObject(this, &ThisClass::OnNewPawnGameplayReady));
+	}
+}
+
+void USFDeathUIComponent::OnPossessedPawnChanged(APawn* OldPawn, APawn* NewPawn)
+{
+	APlayerController* PC = GetController<APlayerController>();
+	if (!PC)
+	{
+		return;
+	}
+
+	// 새 Hero Pawn이면 InitState 바인딩
+	if (NewPawn && NewPawn->IsA(ASFHero::StaticClass()))
+	{
+		PC->OnPossessedPawnChanged.RemoveDynamic(this, &ThisClass::OnPossessedPawnChanged);
+		BindToNewPawnInitState();
+	}
+}
+
+void USFDeathUIComponent::OnNewPawnGameplayReady(const FActorInitStateChangedParams& Params)
+{
+	// 핸들 초기화
+	PawnInitStateHandle.Reset();
+
 	APlayerController* PC = GetController<APlayerController>();
 	if (!PC)
 	{
@@ -262,12 +331,6 @@ void USFDeathUIComponent::HideDeathScreen()
 	if (USFSpectatorComponent* SpectatorComp = PC->FindComponentByClass<USFSpectatorComponent>())
 	{
 		SpectatorComp->StopSpectating();
-	}
-
-	// DeathScreen 제거
-	if (DeathScreenWidget && DeathScreenWidget->IsInViewport())
-	{
-		DeathScreenWidget->RemoveFromParent();
 	}
 }
 

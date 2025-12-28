@@ -29,14 +29,8 @@ void USFPartyWidgetController::BroadcastInitialSets()
 		return;
 	}
 
-	TArray<APlayerState*> SortedPlayers = SFGameState->PlayerArray;
-	SortedPlayers.Sort([](const APlayerState& A, const APlayerState& B)
-	{
-		return A.GetPlayerId() < B.GetPlayerId();
-	});
-	
-	// 현재 GameState의 PlayerArray를 순회하며 초기 목록 브로드캐스트
-	for (APlayerState* PS : SortedPlayers)
+	// 초기 플레이어들 추가 (정렬은 GetSortedMemberControllers에서 처리)
+	for (APlayerState* PS : SFGameState->PlayerArray)
 	{
 		HandlePlayerAdded(PS);
 	}
@@ -45,7 +39,7 @@ void USFPartyWidgetController::BroadcastInitialSets()
 TArray<USFPartyMemberWidgetController*> USFPartyWidgetController::GetSortedMemberControllers() const
 {
 	TArray<USFPartyMemberWidgetController*> Result;
-	
+    
 	for (const auto& Pair : PartyMemberControllerMap)
 	{
 		if (Pair.Value)
@@ -54,13 +48,14 @@ TArray<USFPartyMemberWidgetController*> USFPartyWidgetController::GetSortedMembe
 		}
 	}
 
+	// PlayerSlot 기준 정렬
 	Result.Sort([](const USFPartyMemberWidgetController& A, const USFPartyMemberWidgetController& B)
 	{
-		const APlayerState* PSA = A.GetTargetPlayerState();
-		const APlayerState* PSB = B.GetTargetPlayerState();
+		const ASFPlayerState* PSA = Cast<ASFPlayerState>(A.GetTargetPlayerState());
+		const ASFPlayerState* PSB = Cast<ASFPlayerState>(B.GetTargetPlayerState());
 		if (PSA && PSB)
 		{
-			return PSA->GetPlayerId() < PSB->GetPlayerId();
+			return PSA->GetPlayerSelection().GetPlayerSlot() < PSB->GetPlayerSelection().GetPlayerSlot();
 		}
 		return false;
 	});
@@ -92,6 +87,11 @@ void USFPartyWidgetController::HandlePlayerRemoved(APlayerState* InPlayerState)
 	}
 }
 
+void USFPartyWidgetController::HandlePlayerInfoChangedForReorder(const FSFPlayerSelectionInfo& NewPlayerSelection)
+{
+	OnPartyOrderChanged.Broadcast();
+}
+
 void USFPartyWidgetController::AddAndBroadcastMember(ASFPlayerState* PlayerState)
 {
 	// TMap에 이미 존재하는지 확인 
@@ -119,8 +119,10 @@ void USFPartyWidgetController::AddAndBroadcastMember(ASFPlayerState* PlayerState
 	MemberController->BindCallbacksToDependencies();
 
 	PartyMemberControllerMap.Add(PlayerState, MemberController);
-	OnPartyMemberAdded.Broadcast(MemberController);
 
+	PlayerState->OnPlayerInfoChanged.AddDynamic(this, &USFPartyWidgetController::HandlePlayerInfoChangedForReorder);
+	
+	OnPartyMemberAdded.Broadcast(MemberController);
 	OnPartyOrderChanged.Broadcast();
 
 	// 위젯에 위젯 컨트롤러 설정(WBP_PartyInfo에서 호출함)
@@ -132,6 +134,7 @@ void USFPartyWidgetController::RemoveAndBroadcastMember(ASFPlayerState* PlayerSt
 	USFPartyMemberWidgetController* MemberController = PartyMemberControllerMap.FindRef(PlayerState);
 	if (MemberController)
 	{
+		PlayerState->OnPlayerInfoChanged.RemoveDynamic(this, &USFPartyWidgetController::HandlePlayerInfoChangedForReorder);
 		PartyMemberControllerMap.Remove(PlayerState);
 		OnPartyMemberRemoved.Broadcast(MemberController);
 

@@ -44,6 +44,10 @@ protected:
 	UFUNCTION()
 	void HandlePlayerRemoved(APlayerState* InPlayerState);
 
+	// PlayerSelection 변경 시 재정렬을 위한 핸들러
+	UFUNCTION()
+	void HandlePlayerInfoChangedForReorder(const FSFPlayerSelectionInfo& NewPlayerSelection);
+
 	// 멤버 컨트롤러를 생성하고 브로드캐스트
 	void AddAndBroadcastMember(ASFPlayerState* PlayerState);
 
