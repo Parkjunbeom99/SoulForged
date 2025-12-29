@@ -2,6 +2,9 @@
 
 #include "SFLogChannels.h"
 #include "Character/Hero/SFHeroDefinition.h"
+#include "Data/Common/SFCommonLootTable.h"
+#include "Data/Common/SFCommonRarityConfig.h"
+#include "Data/Common/SFCommonUpgradeDefinition.h"
 
 void USFAssetManager::StartInitialLoading()
 {
@@ -55,8 +58,14 @@ const USFGameData& USFAssetManager::GetGameData()
 TArray<FPrimaryAssetType> USFAssetManager::GetManagedPrimaryAssetTypes() const
 {
 	TArray<FPrimaryAssetType> Types;
+
+    // HeroDefinition PrimaryDataAsset
 	Types.Add(USFHeroDefinition::GetHeroDefinitionAssetType());
-	// TODO: Types.Add(USFItemDefinition::GetItemDefinitionAssetType());
+
+    // CommonUpgrade PrimaryDataAssets
+    Types.Add(USFCommonUpgradeDefinition::GetCommonUpgradeDefinitionAssetType());
+    Types.Add(USFCommonRarityConfig::GetCommonRarityConfigAssetType());
+    Types.Add(USFCommonLootTable::GetCommonLootTableAssetType());
 	return Types;
 }
 
@@ -91,7 +100,7 @@ void USFAssetManager::LoadAllPrimaryAssets()
         }
     }
 
-    // 2단계: Lobby 번들 동기 로드
+    // 2단계: Lobby 번들 동기 로드(현재는 메인 메뉴 진입시에 Lobby에 필요한 에셋 번들 로드)
     TArray<FPrimaryAssetId> AllAssetIds;
     for (const FPrimaryAssetType& AssetType : ManagedTypes)
     {
