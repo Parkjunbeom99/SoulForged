@@ -7,6 +7,14 @@
 
 class UGameplayEffect;
 
+UENUM(BlueprintType)
+enum class ESFUpgradeDisplayType : uint8
+{
+	Raw,        // 그냥 수치 (공격력 +5)
+	Percent,    // 퍼센트 (치명타 확률 +5%)
+	PerSecond   // 초당 (마나 재생 +0.5/초)
+};
+
 /**
  * 업그레이드의 개별 효과를 정의하는 기본 Fragment 클래스
  * DefaultToInstanced, EditInlineNew: 에디터 내 인스턴스 생성 지원

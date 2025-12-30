@@ -77,7 +77,7 @@ TArray<FSFCommonUpgradeChoice> USFCommonUpgradeManagerSubsystem::GenerateUpgrade
         SelectedDefinitions.Add(ChosenDef);
 
         // 희귀도(Rarity) 랜덤 결정
-        USFCommonRarityConfig* ChosenRarity = RollRarity();
+        USFCommonRarityConfig* ChosenRarity = PickRandomRarity();
 
         // 결과 구조체 생성
         FSFCommonUpgradeChoice Choice;
@@ -96,7 +96,7 @@ TArray<FSFCommonUpgradeChoice> USFCommonUpgradeManagerSubsystem::GenerateUpgrade
         }
         else
         {
-            // 스탯 강화가 아닌 경우 (예: 스킬 레벨업) 기본 설명 사용
+            // 스탯 강화가 아닌 경우 (예: 스킬 레벨업 등) 기본 설명 사용
             Choice.DynamicDescription = ChosenDef->DescriptionFormat;
         }
 
@@ -108,35 +108,36 @@ TArray<FSFCommonUpgradeChoice> USFCommonUpgradeManagerSubsystem::GenerateUpgrade
     Context.SourceLootTable = LootTable;
     Context.SlotCount = Count;
     Context.PendingChoices = NewChoices;
-    Context.GeneratedTime = GetWorld()->GetTimeSeconds();
 
     return NewChoices;
 }
 
-bool USFCommonUpgradeManagerSubsystem::TryRerollOptions(ASFPlayerState* PlayerState)
+TArray<FSFCommonUpgradeChoice> USFCommonUpgradeManagerSubsystem::TryRerollOptions(ASFPlayerState* PlayerState)
 {
+    TArray<FSFCommonUpgradeChoice> EmptyResult;
+    
     if (!PlayerState)
     {
-        return false;
+        return EmptyResult;
     }
     
     UAbilitySystemComponent* ASC = PlayerState->GetAbilitySystemComponent();
     if (!ASC)
     {
-        return false;
+        return EmptyResult;
     }
     
     // 리롤 티켓 확인 (실제로는 PlayerCombatState의 bool값을 체크할 수도 있음)
     int32 TicketCount = ASC->GetGameplayTagCount(RerollCostTag);
     if (TicketCount <= 0)
     {
-        return false; // 티켓 부족 -> 리롤 실패
+        return EmptyResult; // 티켓 부족 -> 리롤 실패
     }
 
     const FSFCommonUpgradeContext* ContextPtr = ActiveUpgradeContexts.Find(PlayerState);
-    if (!ContextPtr)
+    if (!ContextPtr || !ContextPtr->SourceLootTable)
     {
-        return false; // 이 플레이어는 현재 리롤할 수 있는 선택지가 없음
+        return EmptyResult; // 이 플레이어는 현재 리롤할 수 있는 선택지가 없음
     }
 
     // GenerateUpgradeOptions 내부에서 Map을 갱신할 수 있으므로 필요한 정보를 미리 복사
@@ -147,9 +148,7 @@ bool USFCommonUpgradeManagerSubsystem::TryRerollOptions(ASFPlayerState* PlayerSt
     // ASC->RemoveLooseGameplayTag(RerollCostTag, 1);
 
     // 찾아낸 테이블과 개수 정보를 사용하여 리롤
-    GenerateUpgradeOptions(PlayerState, SourceTable, SlotCount);
-
-    return true;
+    return GenerateUpgradeOptions(PlayerState, SourceTable, SlotCount);
 }
 
 bool USFCommonUpgradeManagerSubsystem::ApplyUpgradeChoice(ASFPlayerState* PlayerState, const FGuid& ChoiceId)
@@ -203,7 +202,7 @@ bool USFCommonUpgradeManagerSubsystem::ApplyUpgradeChoice(ASFPlayerState* Player
         {
             ApplyStatBoostFragment(ASC, StatBoost, FoundChoice->FinalMagnitude);
         }
-        else if (const auto* SkillLevel = Cast<USFCommonUpgradeFragment_SkillLevel>(Fragment))
+        if (const auto* SkillLevel = Cast<USFCommonUpgradeFragment_SkillLevel>(Fragment))
         {
             ApplySkillLevelFragment(ASC, SkillLevel);
         }
@@ -234,42 +233,6 @@ bool USFCommonUpgradeManagerSubsystem::ApplyUpgradeChoiceByIndex(ASFPlayerState*
     }
 
     return ApplyUpgradeChoice(PlayerState, Context->PendingChoices[ChoiceIndex].UniqueId);
-}
-
-bool USFCommonUpgradeManagerSubsystem::GetPendingChoices(ASFPlayerState* PlayerState, TArray<FSFCommonUpgradeChoice>& OutChoices) const
-{
-    if (!PlayerState)
-    {
-        return false;
-    }
-
-    const FSFCommonUpgradeContext* Context = ActiveUpgradeContexts.Find(PlayerState);
-    if (!Context || Context->PendingChoices.IsEmpty())
-    {
-        return false;
-    }
-
-    OutChoices = Context->PendingChoices;
-    return true;
-}
-
-bool USFCommonUpgradeManagerSubsystem::HasPendingUpgrade(ASFPlayerState* PlayerState) const
-{
-    if (!PlayerState)
-    {
-        return false;
-    }
-
-    const FSFCommonUpgradeContext* Context = ActiveUpgradeContexts.Find(PlayerState);
-    return Context && !Context->PendingChoices.IsEmpty();
-}
-
-void USFCommonUpgradeManagerSubsystem::ClearPendingUpgrade(ASFPlayerState* PlayerState)
-{
-    if (PlayerState)
-    {
-        ActiveUpgradeContexts.Remove(PlayerState);
-    }
 }
 
 USFCommonUpgradeDefinition* USFCommonUpgradeManagerSubsystem::PickRandomUpgrade(const USFCommonLootTable* Table, const TSet<USFCommonUpgradeDefinition*>& ExcludedItems)
@@ -325,7 +288,7 @@ USFCommonUpgradeDefinition* USFCommonUpgradeManagerSubsystem::PickRandomUpgrade(
     return nullptr;
 }
 
-USFCommonRarityConfig* USFCommonUpgradeManagerSubsystem::RollRarity()
+USFCommonRarityConfig* USFCommonUpgradeManagerSubsystem::PickRandomRarity()
 {
     if (CachedRarityConfigs.Num() <= 0 || CachedTotalRarityWeight <= 0.f)
     {

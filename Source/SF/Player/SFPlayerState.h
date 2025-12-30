@@ -12,6 +12,7 @@
 #include "System/Data/SFPermanentUpgradeTypes.h"
 #include "SFPlayerState.generated.h"
 
+class USFCommonUpgradeComponent;
 class USFGameplayAbility;
 class USFCombatSet_Hero;
 class USFPrimarySet_Hero;
@@ -208,10 +209,15 @@ private:
 	FSFPermanentUpgradeData LastAppliedPermanentUpgradeData;
 	//===========================
 
+	
+	//=====Common Upgrade=======
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<USFCommonUpgradeComponent> CommonUpgradeComponent;
+	
 	//=====Combat State=====
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<USFPlayerCombatStateComponent> CombatStateComponent;
 	
 
-	//======================
+	
 };
