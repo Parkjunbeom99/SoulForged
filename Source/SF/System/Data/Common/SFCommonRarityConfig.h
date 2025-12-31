@@ -39,11 +39,11 @@ public:
 	 * 예시: Epic 등급은 Luck이 높을수록 Y값이 올라가는 커브 설정
 	 * 예시: Uncommon 등급은 Luck이 높을수록 Y값이 내려가는 커브 설정
 	 */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SF|Weight")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SF|Weight", meta = (AssetBundles = "InGame"))
 	TSoftObjectPtr<UCurveFloat> LuckWeightCurve;
 
 	// 등급별 프레임/배경 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SF|UI", meta = (AssetBundles = "UI"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SF|UI", meta = (AssetBundles = "InGame"))
 	TSoftObjectPtr<UTexture2D> FrameTexture;
 
 	// 등급별 색상

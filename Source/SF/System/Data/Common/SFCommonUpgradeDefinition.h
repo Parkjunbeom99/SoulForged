@@ -32,7 +32,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SF|UI", meta = (MultiLine = "true"))
 	FText DescriptionFormat;
 	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SF|UI", meta = (AssetBundles = "UI"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SF|UI", meta = (AssetBundles = "InGame"))
 	TSoftObjectPtr<UTexture2D> Icon;
 
 	// 허용된 등급 태그 (비어있으면 모든 등급에서 출현) 
