@@ -129,6 +129,7 @@ void ASFPlayerState::CopyProperties(APlayerState* PlayerState)
 	NewPlayerState->SetGenericTeamId(MyTeamID);
 
 	// Permanent Upgrade 데이터도 SeamlessTravel/InactivePlayer에 이어받도록 복사
+	NewPlayerState->bPermanentUpgradeAppliedThisGame = bPermanentUpgradeAppliedThisGame;
 	NewPlayerState->PermanentUpgradeData = PermanentUpgradeData;
 	NewPlayerState->bPermanentUpgradeDataReceived = bPermanentUpgradeDataReceived;
 	
@@ -268,7 +269,9 @@ void ASFPlayerState::OnPawnDataLoadComplete(const USFPawnData* LoadedPawnData)
     
 	bPawnDataLoaded = true;
 	PawnDataHandle.Reset();
-    
+	
+	TryApplyPermanentUpgrade();
+	
 	// 델리게이트 브로드캐스트 - GameMode가 처리
 	OnPawnDataLoaded.Broadcast(LoadedPawnData);
 }
@@ -309,7 +312,7 @@ void ASFPlayerState::SetPawnData(const USFPawnData* InPawnData)
 		}
 
 		// 강화는 "서버가 PlayFab 데이터를 수신한 이후"에만 적용되어야 함
-		TryApplyPermanentUpgrade();
+		//TryApplyPermanentUpgrade();
 	}
 	
 
@@ -487,7 +490,7 @@ void ASFPlayerState::SetPermanentUpgradeData(const FSFPermanentUpgradeData& InDa
 	// 값이 0이어도 "데이터 수신 완료"로 취급해야 함
 	bPermanentUpgradeDataReceived = true;
 
-	//TryApplyPermanentUpgrade();
+	TryApplyPermanentUpgrade();
 }
 void ASFPlayerState::Server_SubmitPermanentUpgradeData_Implementation(const FSFPermanentUpgradeData& InData)
 {
@@ -506,6 +509,15 @@ bool ASFPlayerState::ArePermanentUpgradeDataEqual(const FSFPermanentUpgradeData&
 
 void ASFPlayerState::TryApplyPermanentUpgrade()
 {
+	UE_LOG(LogTemp, Warning, TEXT("[PermanentUpgrade] TryApply ENTER | this=%p PlayerId=%d Name=%s AppliedThisGame=%d"),
+	this, GetPlayerId(), *GetPlayerName(), bPermanentUpgradeAppliedThisGame ? 1 : 0);
+
+	//이미 이번 게임에서 적용됐다면 무조건 스킵
+	if (bPermanentUpgradeAppliedThisGame)
+	{
+		return;
+	}
+	
 	UE_LOG(LogTemp, Warning, TEXT("[PermanentUpgrade] TryApply | Auth=%d Received=%d ASC=%s Avatar=%s Comp=%s"),
 		HasAuthority() ? 1 : 0,
 		bPermanentUpgradeDataReceived ? 1 : 0,
@@ -530,6 +542,12 @@ void ASFPlayerState::TryApplyPermanentUpgrade()
 		return;
 	}
 
+	if (!AbilitySystemComponent->GetAvatarActor())
+	{
+		SchedulePermanentUpgradeRetry();
+		return;
+	}
+	
 	if (bHasLastAppliedPermanentUpgradeData && ArePermanentUpgradeDataEqual(LastAppliedPermanentUpgradeData, PermanentUpgradeData))
 	{
 		return;
@@ -546,4 +564,32 @@ void ASFPlayerState::TryApplyPermanentUpgrade()
 
 	bHasLastAppliedPermanentUpgradeData = true;
 	LastAppliedPermanentUpgradeData = PermanentUpgradeData;
+
+	GetWorld()->GetTimerManager().ClearTimer(PermanentUpgradeRetryTimer);
+	bPermanentUpgradeAppliedThisGame = true;
+}
+
+void ASFPlayerState::SchedulePermanentUpgradeRetry()
+{
+	UE_LOG(LogTemp, Error, TEXT("[PermanentUpgrade] ScheduleRetry"));
+	
+	if (!GetWorld())
+	{
+		return;
+	}
+
+	// 이미 예약돼 있으면 중복 예약 금지
+	if (GetWorld()->GetTimerManager().IsTimerActive(PermanentUpgradeRetryTimer))
+	{
+		return;
+	}
+
+	// 0.2초 후 재시도 (필요시 0.1~0.5 사이로 조절)
+	GetWorld()->GetTimerManager().SetTimer(
+		PermanentUpgradeRetryTimer,
+		this,
+		&ASFPlayerState::TryApplyPermanentUpgrade,
+		0.2f,
+		false
+	);
 }

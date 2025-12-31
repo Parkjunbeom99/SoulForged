@@ -86,6 +86,7 @@ namespace SFGameplayTags
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Hero_Luck);
 
 	// Cost
+	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Cost_Stamina);
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Cost_DodgeStamina);
 
 	// Stage

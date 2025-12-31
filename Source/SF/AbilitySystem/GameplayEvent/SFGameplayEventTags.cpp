@@ -86,6 +86,7 @@ namespace SFGameplayTags
 
 
 	// Cost
+	UE_DEFINE_GAMEPLAY_TAG(Data_Cost_Stamina, "Data.Cost.Stamina");
 	UE_DEFINE_GAMEPLAY_TAG(Data_Cost_DodgeStamina, "Data.Cost.DodgeStamina");
 
 	// Stage

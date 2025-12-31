@@ -44,6 +44,14 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "SF|PlayerController")
 	USFAbilitySystemComponent* GetSFAbilitySystemComponent() const;
+  
+public:
+  //영구강화
+  UFUNCTION(Server, Reliable)
+  void Server_SendPermanentUpgradeData(const FSFPermanentUpgradeData& InData);
+
+  UFUNCTION(Client, Reliable)
+  void Client_BeginPermanentUpgradeFlow();
 
 protected:
 	virtual void PostProcessInput(const float DeltaTime, const bool bGamePaused) override;
@@ -107,4 +115,5 @@ private:
 
 	// 최소 전송 간격
 	static constexpr float ViewRotationSendInterval = 0.05f;
+
 };

@@ -27,6 +27,7 @@ void USFAssetManager::PostInitialAssetScan()
 	LoadAllPrimaryAssets();
 }
 
+#if WITH_EDITOR
 void USFAssetManager::PreBeginPIE(bool bStartSimulate)
 {
 	Super::PreBeginPIE(bStartSimulate);
@@ -37,6 +38,7 @@ void USFAssetManager::PreBeginPIE(bool bStartSimulate)
 		LoadAllPrimaryAssets();
 	}
 }
+#endif
 
 USFAssetManager& USFAssetManager::Get()
 {
