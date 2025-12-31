@@ -137,6 +137,8 @@ void USFGA_Hero_BasicAttack::ExecuteAttackStep(int32 StepIndex)
 	// }
 
 	const FSFBasicAttackStep& CurrentStep = AttackSteps[StepIndex];
+	
+	ResetHitActors();
 
 	// 단계별 스태미나 비용을 지불하고, 부족하면 어빌리티를 종료함
 	if (!CheckAndApplyStepCost(CurrentStep.StaminaCost))
