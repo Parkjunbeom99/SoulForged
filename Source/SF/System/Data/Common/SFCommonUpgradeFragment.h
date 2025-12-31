@@ -16,6 +16,27 @@ enum class ESFUpgradeDisplayType : uint8
 };
 
 /**
+ * 등급별 수치 범위
+ */
+USTRUCT(BlueprintType)
+struct FSFRarityMagnitudeRange
+{
+	GENERATED_BODY()
+
+	// 적용 등급 태그 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FGameplayTag RarityTag;
+
+	// 최소 수치
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	float MinMagnitude = 1.0f;
+
+	// 최대 수치
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	float MaxMagnitude = 1.0f;
+};
+
+/**
  * 업그레이드의 개별 효과를 정의하는 기본 Fragment 클래스
  * DefaultToInstanced, EditInlineNew: 에디터 내 인스턴스 생성 지원
  */
@@ -35,7 +56,13 @@ class SF_API USFCommonUpgradeFragment_StatBoost : public USFCommonUpgradeFragmen
 	GENERATED_BODY()
 
 public:
-	// 적용할 GameplayEffect
+	float GetRandomMagnitudeForRarity(const FGameplayTag& RarityTag) const;
+	float GetSteppedRandomValue(float Min, float Max) const;
+	float GetDisplayValue(float RawValue) const;
+	FText FormatDisplayValue(float RawValue) const;
+public:
+
+	// 적용할 GameplayEffect (스탯별 개별 GE)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS")
 	TSubclassOf<UGameplayEffect> EffectClass;
 
@@ -43,9 +70,22 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS")
 	FGameplayTag AttributeTag;
 
-	// 기본 적용 수치 (희귀도 배율 적용 전)
+	// 등급별 수치 범위
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats")
-	float BaseMagnitude = 10.0f;
+	TArray<FSFRarityMagnitudeRange> RarityMagnitudeRanges;
+
+	// UI 표기 타입
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Display")
+	ESFUpgradeDisplayType DisplayType = ESFUpgradeDisplayType::Raw;
+
+	// PerSecond 타입일 때 재생 주기
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Display", meta = (EditCondition = "DisplayType == ESFUpgradeDisplayType::PerSecond", EditConditionHides))
+	float RegenTickInterval = 0.1f;
+
+	// 소수점 자릿수
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Display")
+	int32 DecimalPlaces = 0;
+	
 };
 
 /**

@@ -22,6 +22,8 @@ public:
 		return FPrimaryAssetId(GetCommonUpgradeDefinitionAssetType(), GetFName());
 	}
 	static FPrimaryAssetType GetCommonUpgradeDefinitionAssetType() { return FPrimaryAssetType(TEXT("CommonUpgradeDefinition")); }
+
+	bool IsAllowedForRarity(const FGameplayTag& RarityTag) const;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SF|UI")
 	FText DisplayName;
@@ -33,10 +35,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SF|UI", meta = (AssetBundles = "UI"))
 	TSoftObjectPtr<UTexture2D> Icon;
 
-	// 분류 및 필터링 (ex: Upgrade.Stat.AttackPower)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tags")
-	FGameplayTag IdentifierTag; 
-
+	// 허용된 등급 태그 (비어있으면 모든 등급에서 출현) 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Restriction")
+	FGameplayTagContainer AllowedRarityTags;
+	
 	// 조립식 기능 정의 (Fragments)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Instanced, Category = "Behavior")
 	TArray<TObjectPtr<USFCommonUpgradeFragment>> Fragments;

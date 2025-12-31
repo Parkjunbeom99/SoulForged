@@ -7,6 +7,7 @@
 #include "SFCommonUpgradeDefinition.h"
 #include "SFCommonUpgradeFragment.h"
 #include "SFLogChannels.h"
+#include "AbilitySystem/Attributes/Hero/SFCombatSet_Hero.h"
 #include "Player/SFPlayerState.h"
 #include "System/SFAssetManager.h"
 
@@ -36,22 +37,20 @@ void USFCommonUpgradeManagerSubsystem::CacheCoreData()
     // 이미 메모리에 로드된 RarityConfig 목록을 가져옴
     AssetManager.GetPrimaryAssetObjectList(USFCommonRarityConfig::GetCommonRarityConfigAssetType(), LoadedObjects);
 
-    CachedTotalRarityWeight = 0.0f;
     CachedRarityConfigs.Empty();
     
     for (UObject* Obj : LoadedObjects)
     {
         if (USFCommonRarityConfig* RarityConfig = Cast<USFCommonRarityConfig>(Obj))
         {
-            CachedTotalRarityWeight += RarityConfig->Weight;
             CachedRarityConfigs.Add(RarityConfig);
         }
     }
     
-    // 가중치(Weight) 순으로 정렬 
+    // BaseWeight 기준 정렬 (낮은 순 = 희귀한 순)
     CachedRarityConfigs.Sort([](const USFCommonRarityConfig& A, const USFCommonRarityConfig& B) 
     {
-         return A.Weight < B.Weight; 
+         return A.BaseWeight < B.BaseWeight; 
     });
 }
 
@@ -63,21 +62,23 @@ TArray<FSFCommonUpgradeChoice> USFCommonUpgradeManagerSubsystem::GenerateUpgrade
         return NewChoices;
     }
 
+    float LuckValue = GetPlayerLuck(PlayerState);
     TSet<USFCommonUpgradeDefinition*> SelectedDefinitions;
 
     for (int32 i = 0; i < Count; ++i)
     {
-        // LootTable에서 가중치 랜덤으로 아이템 뽑기
-        USFCommonUpgradeDefinition* ChosenDef = PickRandomUpgrade(LootTable, SelectedDefinitions);
+        // Luck 기반 등급 결정
+        USFCommonRarityConfig* ChosenRarity = PickRandomRarity(LuckValue);
+        FGameplayTag RarityTag = ChosenRarity ? ChosenRarity->RarityTag : FGameplayTag();
+        
+        // LootTable에서 가중치 랜덤으로 아이템 뽑기(해당 등급에서 허용된 Definition만 선택)
+        USFCommonUpgradeDefinition* ChosenDef = PickRandomUpgrade(LootTable, SelectedDefinitions, RarityTag);
         if (!ChosenDef)
         {
             continue;
         }
         
         SelectedDefinitions.Add(ChosenDef);
-
-        // 희귀도(Rarity) 랜덤 결정
-        USFCommonRarityConfig* ChosenRarity = PickRandomRarity();
 
         // 결과 구조체 생성
         FSFCommonUpgradeChoice Choice;
@@ -88,15 +89,18 @@ TArray<FSFCommonUpgradeChoice> USFCommonUpgradeManagerSubsystem::GenerateUpgrade
         // 수치 계산 (StatBoost Fragment가 있다면 수치를 계산해서 미리 확정)
         if (const USFCommonUpgradeFragment_StatBoost* Fragment = ChosenDef->FindFragment<USFCommonUpgradeFragment_StatBoost>())
         {
-            float Multiplier = ChosenRarity ? ChosenRarity->StatMultiplier : 1.0f;
-            Choice.FinalMagnitude = Fragment->BaseMagnitude * Multiplier;
-            
-            // UI 표시에 사용할 완성된 설명문 생성 (예: "공격력이 15 증가합니다.")
-            Choice.DynamicDescription = FText::Format(ChosenDef->DescriptionFormat, Choice.FinalMagnitude);
+            // 등급 태그로 해당 등급의 수치 범위에서 랜덤 선택
+            Choice.FinalMagnitude = Fragment->GetRandomMagnitudeForRarity(RarityTag);
+            // UI 표시용 텍스트 생성
+            FText DisplayValue = Fragment->FormatDisplayValue(Choice.FinalMagnitude);
+            Choice.DynamicDescription = FText::Format(ChosenDef->DescriptionFormat, DisplayValue);
+        }
+        else if (const USFCommonUpgradeFragment_SkillLevel* SkillFragment = ChosenDef->FindFragment<USFCommonUpgradeFragment_SkillLevel>())
+        {
+            Choice.DynamicDescription = FText::Format(ChosenDef->DescriptionFormat, FText::AsNumber(SkillFragment->LevelIncrement));
         }
         else
         {
-            // 스탯 강화가 아닌 경우 (예: 스킬 레벨업 등) 기본 설명 사용
             Choice.DynamicDescription = ChosenDef->DescriptionFormat;
         }
 
@@ -111,6 +115,26 @@ TArray<FSFCommonUpgradeChoice> USFCommonUpgradeManagerSubsystem::GenerateUpgrade
 
     return NewChoices;
 }
+
+float USFCommonUpgradeManagerSubsystem::GetPlayerLuck(ASFPlayerState* PlayerState) const
+{
+    if (!PlayerState)
+    {
+        return 0.0f;
+    }
+
+    UAbilitySystemComponent* ASC = PlayerState->GetAbilitySystemComponent();
+    if (!ASC)
+    {
+        return 0.0f;
+    }
+
+    bool bFound = false;
+    float LuckValue = ASC->GetGameplayAttributeValue(USFCombatSet_Hero::GetLuckAttribute(), bFound);
+
+    return bFound ? LuckValue : 0.0f;
+}
+
 
 TArray<FSFCommonUpgradeChoice> USFCommonUpgradeManagerSubsystem::TryRerollOptions(ASFPlayerState* PlayerState)
 {
@@ -235,78 +259,96 @@ bool USFCommonUpgradeManagerSubsystem::ApplyUpgradeChoiceByIndex(ASFPlayerState*
     return ApplyUpgradeChoice(PlayerState, Context->PendingChoices[ChoiceIndex].UniqueId);
 }
 
-USFCommonUpgradeDefinition* USFCommonUpgradeManagerSubsystem::PickRandomUpgrade(const USFCommonLootTable* Table, const TSet<USFCommonUpgradeDefinition*>& ExcludedItems)
+USFCommonUpgradeDefinition* USFCommonUpgradeManagerSubsystem::PickRandomUpgrade(const USFCommonLootTable* Table, const TSet<USFCommonUpgradeDefinition*>& ExcludedItems, const FGameplayTag& RarityTag)
 {
     if (!Table)
     {
         return nullptr;
     }
-    
-    // 총 가중치 계산 (이미 선택된 아이템 제외)
+
+    // 유효한 후보 찾기
+    TArray<TPair<USFCommonUpgradeDefinition*, float>> ValidCandidates;
     float TotalWeight = 0.0f;
 
-    // 제외된 아이템이 하나도 없다면 미리 캐싱해둔 TotalWeight를 즉시 사용
-    if (ExcludedItems.IsEmpty())
-    {
-        TotalWeight = Table->GetCachedTotalWeight();
-    }
-    else
-    {
-        // 제외된 아이템이 있다면 유효한 아이템들의 가중치만 다시 합산 
-        for (const FSFCommonLootEntry& Entry : Table->LootEntries)
-        {
-            USFCommonUpgradeDefinition* Def = Entry.UpgradeDefinition.Get();
-            if (Def && !ExcludedItems.Contains(Def))
-            {
-                TotalWeight += Entry.Weight;
-            }
-        }
-    }
-    
-    if (TotalWeight <= 0.0f)
-    {
-        return nullptr;
-    }
-    
-    // 랜덤 선택 로직
-    float RandomPoint = FMath::FRandRange(0.0f, TotalWeight);
     for (const FSFCommonLootEntry& Entry : Table->LootEntries)
     {
         USFCommonUpgradeDefinition* Def = Entry.UpgradeDefinition.Get();
 
-        // 유효성 및 제외 목록 체크
-        if (Def && !ExcludedItems.Contains(Def))
+        if (!Def)
         {
-            RandomPoint -= Entry.Weight;
-            if (RandomPoint <= 0.0f)
-            {
-                return Def;
-            }
+            continue;
         }
+
+        if (ExcludedItems.Contains(Def))
+        {
+            continue;
+        }
+
+        if (!Def->IsAllowedForRarity(RarityTag))
+        {
+            continue;
+        }
+
+        ValidCandidates.Add(TPair<USFCommonUpgradeDefinition*, float>(Def, Entry.Weight));
+        TotalWeight += Entry.Weight;
     }
 
-    return nullptr;
-}
-
-USFCommonRarityConfig* USFCommonUpgradeManagerSubsystem::PickRandomRarity()
-{
-    if (CachedRarityConfigs.Num() <= 0 || CachedTotalRarityWeight <= 0.f)
+    if (ValidCandidates.IsEmpty() || TotalWeight <= 0.0f)
     {
         return nullptr;
     }
 
-    float RandomPoint = FMath::FRandRange(0.0f, CachedTotalRarityWeight);
-    for (const auto& Config : CachedRarityConfigs)
+    // 유효한 후보에서 랜덤 선택
+    float RandomPoint = FMath::FRandRange(0.0f, TotalWeight);
+    for (const auto& Candidate : ValidCandidates)
     {
-        RandomPoint -= Config->Weight;
+        RandomPoint -= Candidate.Value;
         if (RandomPoint <= 0.0f)
         {
-            return Config;
+            return Candidate.Key;
         }
     }
 
-    // Fallback
-    return CachedRarityConfigs.Last();
+    return ValidCandidates.Last().Key;
+}
+
+USFCommonRarityConfig* USFCommonUpgradeManagerSubsystem::PickRandomRarity(float LuckValue)
+{
+    if (CachedRarityConfigs.IsEmpty())
+    {
+        return nullptr;
+    }
+
+    // Luck 기반 가중치 계산
+    float TotalWeight = 0.0f;
+    TArray<TPair<USFCommonRarityConfig*, float>> WeightedConfigs;
+    for (USFCommonRarityConfig* Config : CachedRarityConfigs)
+    {
+        float Weight = Config->GetWeightForLuck(LuckValue);
+        if (Weight > 0.0f)
+        {
+            WeightedConfigs.Add(TPair<USFCommonRarityConfig*, float>(Config, Weight));
+            TotalWeight += Weight;
+        }
+    }
+
+    if (TotalWeight <= 0.0f || WeightedConfigs.IsEmpty())
+    {
+        return CachedRarityConfigs[0];
+    }
+
+    // 가중치 랜덤 선택
+    float RandomPoint = FMath::FRandRange(0.0f, TotalWeight);
+    for (const auto& Pair : WeightedConfigs)
+    {
+        RandomPoint -= Pair.Value;
+        if (RandomPoint <= 0.0f)
+        {
+            return Pair.Key;
+        }
+    }
+
+    return WeightedConfigs.Last().Key;
 }
 
 void USFCommonUpgradeManagerSubsystem::ApplyStatBoostFragment(UAbilitySystemComponent* ASC, const USFCommonUpgradeFragment_StatBoost* Fragment, float FinalMagnitude)

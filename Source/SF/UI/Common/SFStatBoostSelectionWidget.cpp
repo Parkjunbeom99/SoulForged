@@ -7,9 +7,9 @@
 #include "Player/SFPlayerState.h"
 #include "Player/Components/SFCommonUpgradeComponent.h"
 
-void USFStatBoostSelectionWidget::NativeConstruct()
+void USFStatBoostSelectionWidget::NativeOnInitialized()
 {
-    Super::NativeConstruct();
+    Super::NativeOnInitialized();
 
     CardWidgets = { Card_01, Card_02, Card_03 };
 
@@ -34,6 +34,11 @@ void USFStatBoostSelectionWidget::NativeConstruct()
     }
 
     UpdateRerollButtonState();
+}
+
+void USFStatBoostSelectionWidget::NativeConstruct()
+{
+    Super::NativeConstruct();
 }
 
 void USFStatBoostSelectionWidget::NativeDestruct()
@@ -120,6 +125,17 @@ void USFStatBoostSelectionWidget::OnCardSelected(int32 CardIndex)
     }
     
     DisableAllCards();
+
+    for (int32 i = 0; i < CardWidgets.Num(); ++i)
+    {
+        if (CardWidgets[i])
+        {
+            if (i != CardIndex)
+            {
+                CardWidgets[i]->SetVisibility(ESlateVisibility::Collapsed);
+            }
+        }
+    }
 
     // 리롤 버튼도 비활성화
     if (Btn_Reroll)

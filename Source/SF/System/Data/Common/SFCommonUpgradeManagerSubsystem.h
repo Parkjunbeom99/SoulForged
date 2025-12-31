@@ -71,8 +71,9 @@ public:
 
 protected:
 	void CacheCoreData();
-	USFCommonUpgradeDefinition* PickRandomUpgrade(const USFCommonLootTable* Table, const TSet<USFCommonUpgradeDefinition*>& ExcludedItems);
-	USFCommonRarityConfig* PickRandomRarity();
+	float GetPlayerLuck(ASFPlayerState* PlayerState) const;
+	USFCommonUpgradeDefinition* PickRandomUpgrade(const USFCommonLootTable* Table, const TSet<USFCommonUpgradeDefinition*>& ExcludedItems, const FGameplayTag& RarityTag);
+	USFCommonRarityConfig* PickRandomRarity(float LuckValue);
 
 	void ApplyStatBoostFragment(UAbilitySystemComponent* ASC, const USFCommonUpgradeFragment_StatBoost* Fragment, float FinalMagnitude);
 	void ApplySkillLevelFragment(UAbilitySystemComponent* ASC, const USFCommonUpgradeFragment_SkillLevel* Fragment);
@@ -86,9 +87,6 @@ protected:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<USFCommonRarityConfig>> CachedRarityConfigs;
 
-	// Rarity Config들의 총 가중치 합
-	float CachedTotalRarityWeight = 0.0f;
-	
 	// 리롤 비용 태그
 	FGameplayTag RerollCostTag;
 };

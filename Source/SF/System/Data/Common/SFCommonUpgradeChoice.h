@@ -28,7 +28,7 @@ struct FSFCommonUpgradeChoice
 	UPROPERTY(BlueprintReadOnly, Category = "Upgrade")
 	TObjectPtr<const USFCommonRarityConfig> RarityConfig = nullptr;
 
-	// 계산된 최종 수치 (BaseValue * RarityMultiplier) -> SetByCaller로 주입될 값
+	// 계산된 최종 수치 -> SetByCaller로 주입될 값
 	UPROPERTY(BlueprintReadOnly, Category = "Upgrade")
 	float FinalMagnitude = 0.0f;
 

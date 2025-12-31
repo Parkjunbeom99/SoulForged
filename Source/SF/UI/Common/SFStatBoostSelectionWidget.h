@@ -29,7 +29,8 @@ class SF_API USFStatBoostSelectionWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
-	public:
+public:
+    virtual void NativeOnInitialized() override;
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
 
