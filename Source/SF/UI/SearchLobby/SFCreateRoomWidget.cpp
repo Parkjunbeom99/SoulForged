@@ -14,8 +14,6 @@
 void USFCreateRoomWidget::NativeConstruct()
 {
     Super::NativeConstruct();
-
-    bIsFocusable = true;
     
     //===========================GameInstance 캐스팅==========================
     GameInstance = Cast<USFOSSGameInstance>(UGameplayStatics::GetGameInstance(GetWorld()));

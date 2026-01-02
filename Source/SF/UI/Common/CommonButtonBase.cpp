@@ -3,6 +3,7 @@
 #include "Components/TextBlock.h"
 #include "Kismet/GameplayStatics.h"
 #include "Animation/WidgetAnimation.h"
+#include "Fonts/SlateFontInfo.h"
 
 
 void UCommonButtonBase::NativePreConstruct()
@@ -12,6 +13,14 @@ void UCommonButtonBase::NativePreConstruct()
 	if (IsValid(Text_Title))
 	{
 		Text_Title->SetText(ButtonTitle);
+
+		if (FontSizeOverride > 0)
+		{
+			FSlateFontInfo CurrentFontInfo =  Text_Title->GetFont();
+			CurrentFontInfo.Size = FontSizeOverride;
+
+			Text_Title->SetFont(CurrentFontInfo);
+		}
 	}
 }
 

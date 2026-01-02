@@ -2,9 +2,11 @@
 
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Blueprint/UserWidget.h"
 
 #include "UI/SearchLobby/SFCreateRoomWidget.h"
 #include "UI/SearchLobby/SFSearchLobbyWidget.h"
+#include "UI/MainMenu/SFCreditWidget.h"
 
 void UMainMenuWidget::NativeConstruct()
 {
@@ -73,12 +75,34 @@ void UMainMenuWidget::OnSearchMatchClicked()
 
 void UMainMenuWidget::OnOptionsClicked()
 {
-	UE_LOG(LogTemp, Warning, TEXT("Options 버튼 클릭: 옵션 창으로 이동 시도"));
+	if (!OptionsWidgetClass)
+	{
+		UE_LOG(LogTemp, Error, TEXT("OptionsWidgetClass 가 UMainMenuWidget BP에서 설정되지 않았습니다."));
+		return;
+	}
+	
+	UUserWidget* OptionsWidget = CreateWidget<UUserWidget>(this, OptionsWidgetClass);
+
+	if (OptionsWidget)
+	{
+		OptionsWidget->AddToViewport(100);
+	}
 }
 
 void UMainMenuWidget::OnCreditsClicked()
 {
-	UE_LOG(LogTemp, Warning, TEXT("Credits 버튼 클릭: 크레딧 창으로 이동 시도"));
+	if (!CreditsWidgetClass)
+	{
+		UE_LOG(LogTemp, Error, TEXT("CreditsWidgetClass 가 UMainMenuWidget BP에서 설정되지 않았습니다."));
+		return;
+	}
+
+	USFCreditWidget* CreditWidget = CreateWidget<USFCreditWidget>(this, CreditsWidgetClass);
+
+	if (CreditWidget)
+	{
+		CreditWidget->AddToViewport(100);
+	}
 }
 
 void UMainMenuWidget::OnQuitClicked()

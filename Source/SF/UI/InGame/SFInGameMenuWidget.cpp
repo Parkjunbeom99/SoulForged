@@ -46,8 +46,18 @@ void USFInGameMenuWidget::OnResumeClicked()
 
 void USFInGameMenuWidget::OnOptionsClicked()
 {
-	// TODO : Options 메뉴 구현시 연결 예정
-	return;
+	if (!OptionsWidgetClass)
+	{
+		UE_LOG(LogTemp, Error, TEXT("OptionsWidgetClass 가 UInGameMenuWidget BP에서 설정되지 않았습니다."));
+		return;
+	}
+	
+	UUserWidget* OptionsWidget = CreateWidget<UUserWidget>(this, OptionsWidgetClass);
+
+	if (OptionsWidget)
+	{
+		OptionsWidget->AddToViewport(100);
+	}
 }
 
 void USFInGameMenuWidget::OnReturnToTitleClicked()
