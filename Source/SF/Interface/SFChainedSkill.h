@@ -6,6 +6,11 @@
 #include "UObject/Interface.h"
 #include "SFChainedSkill.generated.h"
 
+struct FGameplayAbilitySpecHandle;
+struct FGameplayAbilityActorInfo;
+struct FGameplayAbilityActivationInfo;
+struct FGameplayEffectContextHandle;
+struct FActiveGameplayEffect;
 class UGameplayAbility;
 struct FActiveGameplayEffectHandle;
 class UAbilitySystemComponent;
@@ -59,23 +64,34 @@ public:
 	virtual TArray<FActiveGameplayEffectHandle>& GetAppliedChainEffectHandles() = 0;
 	virtual FGameplayTagContainer GetChainedSkillCooldownTags() const = 0;
 
+	virtual float GetTimeoutCooldownDuration() const = 0;
+	virtual float GetCompleteCooldownDuration() const = 0;
+	virtual float GetChainAbilityLevel() const = 0;
+
 	virtual UTexture2D* GetChainIcon(int32 ChainIndex) const;
-
+	virtual void CompleteCombo(UGameplayAbility* SourceAbility);
+	virtual void ApplyTimeoutCooldown(UGameplayAbility* SourceAbility);
+	
 	int32 GetCurrentChain() const;
-
 	bool CanContinueChain() const;
-
 	bool IsLastChain(int32 StepIndex) const;
 
 	FActiveGameplayEffectHandle ApplyComboState(UGameplayAbility* SourceAbility, int32 NextChainIndex);
 	void RemoveComboState(UGameplayAbility* SourceAbility);
 
-	bool ApplyChainCost(int32 ChainIndex, UGameplayAbility* SourceAbility);
-	void ApplyChainEffects(int32 ChainIndex, UGameplayAbility* SourceAbility);
+	// ComboState 제거 시 호출 (구현 클래스에서 델리게이트 콜백으로 호출)
+	bool HandleComboStateRemoved(UGameplayAbility* SourceAbility, const FActiveGameplayEffect& RemovedEffect);
 
+	bool CheckChainCost(int32 ChainIndex, UAbilitySystemComponent* ASC, float AbilityLevel, const FGameplayEffectContextHandle& ContextHandle, FGameplayTagContainer* OptionalRelevantTags = nullptr) const;
+	UGameplayEffect* GetChainCostEffect(int32 ChainIndex) const;
+	
+	void ApplyChainEffects(int32 ChainIndex, UGameplayAbility* SourceAbility);
 	void RemoveChainEffects();
-	virtual void CompleteCombo(UGameplayAbility* SourceAbility);
+	
+	// 쿨다운 적용 공통 헬퍼 (SetByCaller 방식)
+	void ApplyChainCooldownInternal(UGameplayAbility* SourceAbility, TSubclassOf<UGameplayEffect> CooldownGEClass, float Duration);
 
 protected:
 	void BroadcastChainStateChanged(UGameplayAbility* SourceAbility, int32 ChainIndex);
+
 };

@@ -1,3 +1,4 @@
+// SFEnemyController.cpp
 #include "SFEnemyController.h"
 
 #include "Perception/AISense_Sight.h"
@@ -7,170 +8,180 @@
 #include "AI/Controller/SFEnemyCombatComponent.h"
 #include "Character/SFCharacterGameplayTags.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "AbilitySystemComponent.h"
+#include "AbilitySystemGlobals.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(SFEnemyController)
-
 
 ASFEnemyController::ASFEnemyController(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
 {
-    // AI Perception 생성
     AIPerception = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("AIPerception"));
     SetPerceptionComponent(*AIPerception);
 
-    // 시야 감각 설정 생성 및 기본값 적용
     SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig"));
     SightConfig->SightRadius = SightRadius;
     SightConfig->LoseSightRadius = LoseSightRadius;
     SightConfig->PeripheralVisionAngleDegrees = PeripheralVisionAngleDegrees;
 
-    // 감지할 대상 유형
     SightConfig->DetectionByAffiliation.bDetectEnemies = true;
     SightConfig->DetectionByAffiliation.bDetectFriendlies = false;
     SightConfig->DetectionByAffiliation.bDetectNeutrals = true;
 
-    // 시야 감지 지속 시간
     SightConfig->SetMaxAge(5.0f);
     SightConfig->AutoSuccessRangeFromLastSeenLocation = 500.f;
 
-    // 시야 감각 설정
     AIPerception->ConfigureSense(*SightConfig);
     AIPerception->SetDominantSense(UAISense_Sight::StaticClass());
 
-    // Tick 활성화
     PrimaryActorTick.bCanEverTick = true;
     PrimaryActorTick.TickGroup = TG_PostUpdateWork;
 
-    // CombatComponent 생성
     CombatComponent = ObjectInitializer.CreateDefaultSubobject<USFEnemyCombatComponent>(this, TEXT("CombatComponent"));
+    
+    // 일반 적의 회전 속도 설정
+    RotationInterpSpeed = 8.f; // Dragon보다 빠른 회전
 }
 
+void ASFEnemyController::SetTargetForce(AActor* NewTarget)
+{
+    if (!NewTarget)
+    {
+        return;
+    }
+
+    // 타겟 태그 확인
+    if (!TargetTag.IsNone() && !NewTarget->ActorHasTag(TargetTag))
+    {
+        return;
+    }
+
+    if (CombatComponent)
+    {
+        CombatComponent->UpdateTargetActor(NewTarget);
+    }
+}
 
 void ASFEnemyController::InitializeAIController()
 {
-    // 베이스 클래스의 공통 초기화 호출
     Super::InitializeAIController();
 
     if (HasAuthority())
     {
-        // AIPerception 바인딩 (Enemy 전용)
-        if (AIPerception)
+        // CombatComponent의 전투 상태 변경 이벤트 구독
+        if (CombatComponent)
         {
-            AIPerception->OnTargetPerceptionUpdated.AddDynamic(
-                this, &ASFEnemyController::OnTargetPerceptionUpdated
+            CombatComponent->OnCombatStateChanged.AddDynamic(
+                this, &ASFEnemyController::OnCombatStateChanged
             );
         }
     }
 }
 
-
-
-void ASFEnemyController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
+void ASFEnemyController::OnCombatStateChanged(bool bInCombat)
 {
-    if (!Actor) return;
-
-    // 시야(Sight) 감각인지 확인
-    if (!Stimulus.Type.IsValid() || Stimulus.Type != UAISense::GetSenseID<UAISense_Sight>())
-        return;
-
-    // 타겟 태그 확인
-    if (!TargetTag.IsNone() && !Actor->ActorHasTag(TargetTag))
-        return;
-
-    // CombatComponent에게 알림
-    if (CombatComponent)
+    bIsInCombat = bInCombat;
+    
+    // 시야각 조정
+    if (SightConfig && AIPerception)
     {
-        CombatComponent->HandleTargetPerceptionUpdated(Actor, Stimulus.WasSuccessfullySensed());
+        SightConfig->PeripheralVisionAngleDegrees = bInCombat ? 180.f : PeripheralVisionAngleDegrees;
+        AIPerception->ConfigureSense(*SightConfig);
     }
 
-    // 감지 성공 시
-    if (Stimulus.WasSuccessfullySensed())
+    // 전투 모드에 따라 회전 방식 변경
+    if (bInCombat)
     {
-        TargetActor = Actor;
-
-        // 전투 상태가 아니었다면 전환
-        if (!bIsInCombat)
-        {
-            bIsInCombat = true;
-            SightConfig->PeripheralVisionAngleDegrees = 180.f;
-            AIPerception->ConfigureSense(*SightConfig);
-
-            // 전투 시작 시 ControllerYaw 모드로 전환 (부드러운 회전)
-            SetRotationMode(EAIRotationMode::ControllerYaw);
-        }
-
-        if (CachedBlackboardComponent)
-        {
-            CachedBlackboardComponent->SetValueAsObject("TargetActor", Actor);
-            CachedBlackboardComponent->SetValueAsBool("bHasTarget", true);
-            CachedBlackboardComponent->SetValueAsBool("bIsInCombat", true);
-            CachedBlackboardComponent->SetValueAsVector("LastKnownPosition", Stimulus.StimulusLocation);
-        }
+        SetRotationMode(EAIRotationMode::ControllerYaw);
     }
     else
     {
-        UE_LOG(LogTemp, Log, TEXT("[%s] 시야 상실: %s"), *GetName(), *GetNameSafe(Actor));
-
-        // 시야 상실 시 MovementDirection으로 복귀
         SetRotationMode(EAIRotationMode::MovementDirection);
+    }
+
+    if (CachedBlackboardComponent)
+    {
+        CachedBlackboardComponent->SetValueAsBool("bIsInCombat", bInCombat);
     }
 }
 
-
-
-
-//강제 타겟 설정 함수
-void ASFEnemyController::SetTargetForce(AActor* NewTarget)
+void ASFEnemyController::UpdateControlRotation(float DeltaTime, bool bUpdatePawn)
 {
-    if (!NewTarget || TargetActor == NewTarget)
-    {
-        return;
-    }
+    APawn* MyPawn = GetPawn();
+    if (!MyPawn) return;
 
-    if (!TargetTag.IsNone() && !NewTarget->ActorHasTag(TargetTag))
+    
+    Super::UpdateControlRotation(DeltaTime, false);
+    
+    if (CombatComponent && CombatComponent->GetCurrentTarget())
     {
-        return;
+        AActor* Target = CombatComponent->GetCurrentTarget();
+        FVector ToTarget = Target->GetActorLocation() - MyPawn->GetActorLocation();
+        ToTarget.Z = 0.f;
+        
+        if (!ToTarget.IsNearlyZero())
+        {
+            FRotator TargetRotation = ToTarget.Rotation();
+            SetControlRotation(TargetRotation);
+        }
     }
     
-    TargetActor = NewTarget;
-    
-    // 2. 전투 상태(Combat)가 아니었다면 즉시 전환 및 시야 확장
-    if (!bIsInCombat)
+    if (!ShouldRotateActorByController()) return;
+    if (!bUpdatePawn) return;
+
+    if (CurrentRotationMode == EAIRotationMode::ControllerYaw)
     {
-        bIsInCombat = true;
-        
-        // 전투 중 시야각 확장 (180도)
-        if (SightConfig)
+        RotateActorTowardsController(DeltaTime);
+    }
+}
+
+void ASFEnemyController::RotateActorTowardsController(float DeltaTime)
+{
+    APawn* MyPawn = GetPawn();
+    if (!MyPawn) return;
+
+    FRotator ControllerRot = GetControlRotation();
+    FRotator CurrentActorRot = MyPawn->GetActorRotation();
+    
+    
+    FRotator TargetRot = FRotator(0.f, ControllerRot.Yaw, 0.f);
+
+    float AppliedInterpSpeed = RotationInterpSpeed;
+    
+    bool bIsUsingAbility = false;
+    if (UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(MyPawn))
+    {
+        if (ASC->HasMatchingGameplayTag(SFGameplayTags::Character_State_UsingAbility))
         {
-            SightConfig->PeripheralVisionAngleDegrees = 180.f; 
-            if (AIPerception)
+            bIsUsingAbility = true;
+            AppliedInterpSpeed *= 0.2f; 
+            
+            float YawDiff = FMath::Abs(FMath::FindDeltaAngleDegrees(CurrentActorRot.Yaw, TargetRot.Yaw));
+            if (YawDiff < 15.f)
             {
-                AIPerception->ConfigureSense(*SightConfig);
+                return; 
             }
         }
     }
 
-    // 3. 블랙보드 값 즉시 업데이트 (Behavior Tree 반응 속도 향상)
-    if (CachedBlackboardComponent)
-    {
-        CachedBlackboardComponent->SetValueAsObject("TargetActor", NewTarget);
-        CachedBlackboardComponent->SetValueAsBool("bHasTarget", true);
-        CachedBlackboardComponent->SetValueAsBool("bIsInCombat", true);
-        
-        // 추격 등을 위해 마지막 위치도 업데이트
-        CachedBlackboardComponent->SetValueAsVector("LastKnownPosition", NewTarget->GetActorLocation());
-    }
-
-    // [중요 수정] 여기서 SetFocus를 직접 호출하지 않습니다!
-    // SetFocus(NewTarget); <--- 이 줄이 있으면 피격 순간 몸이 획 돌아버립니다.
-    // 이제 회전은 BT의 'SF Rotate to Target' 태스크나 'UpdateFocus' 서비스가 부드럽게 처리합니다.
-
-    // 5. CombatComponent에도 알림 (거리 계산, 공격 가능 여부 판단 등을 위해 필수)
-    if (CombatComponent)
-    {
-        // 강제로 감지된 것으로 처리하여 내부 상태 갱신
-        CombatComponent->HandleTargetPerceptionUpdated(NewTarget, true);
-    }
+    // 부드럽게 보간하여 회전
+    FRotator NewActorRot = FMath::RInterpTo(CurrentActorRot, TargetRot, DeltaTime, AppliedInterpSpeed);
+    MyPawn->SetActorRotation(NewActorRot);
 }
 
+bool ASFEnemyController::ShouldRotateActorByController() const
+{
+    return true;
+}
 
+float ASFEnemyController::GetTurnThreshold() const
+{
+    // 일반 적은 임계값이 필요 없음 (항상 부드럽게 회전)
+    return 360.f;
+}
+
+bool ASFEnemyController::IsTurningInPlace() const
+{
+    return false;
+}

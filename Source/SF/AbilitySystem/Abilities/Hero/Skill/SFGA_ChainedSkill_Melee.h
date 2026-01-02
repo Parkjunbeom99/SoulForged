@@ -28,14 +28,20 @@ public:
 	virtual TSubclassOf<UGameplayEffect> GetCompleteCooldownEffectClass() const override { return CompleteCooldownEffectClass; }
 	virtual TArray<FActiveGameplayEffectHandle>& GetAppliedChainEffectHandles() override { return AppliedChainEffectHandles; }
 	virtual FGameplayTagContainer GetChainedSkillCooldownTags() const override { return CooldownTags; }
+	virtual float GetTimeoutCooldownDuration() const override;
+	virtual float GetCompleteCooldownDuration() const override;
+	virtual float GetChainAbilityLevel() const override { return GetAbilityLevel(); }
 	// ~ End ISFChainedSkill
 
+	virtual bool CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, OUT FGameplayTagContainer* OptionalRelevantTags = nullptr) const override ;
+	virtual void ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const override;
 	virtual UGameplayEffect* GetCooldownGameplayEffect() const override;
 	
 protected:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
-
+	virtual void ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const override;
+	
 	virtual void OnTrace(FGameplayEventData Payload) override;
 	virtual void ExecuteChainStep(int32 ChainIndex);
 
@@ -44,6 +50,10 @@ protected:
 
 	UFUNCTION()
 	virtual void OnChainMontageInterrupted();
+
+	void BindComboStateRemovedDelegate();
+	void UnbindComboStateRemovedDelegate();
+	virtual void OnComboStateRemoved(const FActiveGameplayEffect& RemovedEffect);
 
 protected:
 	// 연계 스택 추적용 Effect
@@ -64,6 +74,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "SF|Cooldown")
 	TSubclassOf<UGameplayEffect> CompleteCooldownEffectClass;
 
+	// 타임아웃 시 쿨다운 (콤보 중단)
+	UPROPERTY(EditDefaultsOnly, Category = "SF|Cooldown", meta = (DisplayName = "타임아웃 쿨타임(초)"))
+	FScalableFloat TimeoutCooldownDuration = 3.f;
+
+	// 완료 시 쿨다운 (풀 콤보)
+	UPROPERTY(EditDefaultsOnly, Category = "SF|Cooldown", meta = (DisplayName = "완료 쿨타임(초)"))
+	FScalableFloat CompleteCooldownDuration = 10.f;
+	
 	// 쿨다운 체크용 태그 
 	UPROPERTY(EditDefaultsOnly, Category = "SF|Cooldown")
 	FGameplayTagContainer CooldownTags;
@@ -72,9 +90,10 @@ protected:
 
 private:
 	TArray<FActiveGameplayEffectHandle> AppliedChainEffectHandles;
+	FDelegateHandle ComboStateRemovedHandle;
 
 private:
-	// 🔥 ASC에 쿨타임 GE가 "추가되는 순간" 감지
+	// ASC에 쿨타임 GE가 "추가되는 순간" 감지
 	FDelegateHandle CooldownGEAddedHandle;
 
 	void OnCooldownGEAdded(

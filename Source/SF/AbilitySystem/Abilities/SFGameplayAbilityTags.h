@@ -17,6 +17,7 @@ namespace SFGameplayTags
 
 	// Charge Attack (돌진)
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Enemy_Attack_Charge);
+	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Enemy_Movement_Step);
 
 	// Guard Break Attack (가드 파괴)
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Enemy_Attack_GuardBreak);
@@ -30,6 +31,10 @@ namespace SFGameplayTags
 	// AoE Attack (범위)
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Enemy_Attack_AoE);
 
+	// ========== Enemy State Ability Tags ==========
+
+	// Turn In Place (제자리 회전)
+	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Enemy_TurnInPlace);
 
 	// ========== Cooldown Tags ==========
 

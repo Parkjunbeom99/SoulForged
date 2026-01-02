@@ -1,6 +1,8 @@
 #include "SFGA_ChainedSkill_Melee.h"
 
 #include "AbilitySystemComponent.h"
+#include "SFHeroSkillTags.h"
+#include "SFLogChannels.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "AbilitySystem/SFAbilitySystemComponent.h"
@@ -41,13 +43,50 @@ UGameplayEffect* USFGA_ChainedSkill_Melee::GetCooldownGameplayEffect() const
 	return nullptr;
 }
 
+void USFGA_ChainedSkill_Melee::ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const
+{
+	// 체인 스킬은 CommitAbility 시점에 쿨다운 적용하지 않음
+	// Timeout 또는 Complete 시점에 ISFChainedSkill::ApplyChainCooldownInternal()로 적용
+}
+
+float USFGA_ChainedSkill_Melee::GetTimeoutCooldownDuration() const
+{
+	return TimeoutCooldownDuration.GetValueAtLevel(GetAbilityLevel());
+}
+
+float USFGA_ChainedSkill_Melee::GetCompleteCooldownDuration() const
+{
+	return CompleteCooldownDuration.GetValueAtLevel(GetAbilityLevel());
+}
+
+bool USFGA_ChainedSkill_Melee::CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags) const
+{
+	UAbilitySystemComponent* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+	return CheckChainCost(GetCurrentChain(), ASC, GetAbilityLevel(Handle, ActorInfo), MakeEffectContext(Handle, ActorInfo), OptionalRelevantTags);
+}
+
+void USFGA_ChainedSkill_Melee::ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const
+{
+	UGameplayEffect* CostGE = GetChainCostEffect(GetCurrentChain());
+	if (CostGE)
+	{
+		ApplyGameplayEffectToOwner(Handle, ActorInfo, ActivationInfo, CostGE, GetAbilityLevel(Handle, ActorInfo));
+	}
+}
+
 void USFGA_ChainedSkill_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-
+	
 	if (!GetChainASC())
 	{
 		CancelAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true);
+		return;
+	}
+
+	if (!CommitAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo))
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
 
@@ -61,11 +100,11 @@ void USFGA_ChainedSkill_Melee::ActivateAbility(const FGameplayAbilitySpecHandle 
 	// 이미 바인딩돼 있으면 중복 방지
 	if (!CooldownGEAddedHandle.IsValid())
 	{
-		CooldownGEAddedHandle =
-			ASC->OnActiveGameplayEffectAddedDelegateToSelf.AddUObject(
-				this,
-				&ThisClass::OnCooldownGEAdded);
+		CooldownGEAddedHandle = ASC->OnActiveGameplayEffectAddedDelegateToSelf.AddUObject(this, &ThisClass::OnCooldownGEAdded);
 	}
+
+	// ComboState 제거 감지
+	BindComboStateRemovedDelegate();
 	
 	ExecutingChainIndex = GetCurrentChain();
 	ExecuteChainStep(ExecutingChainIndex);
@@ -88,7 +127,7 @@ void USFGA_ChainedSkill_Melee::ExecuteChainStep(int32 ChainIndex)
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
-
+	
 	const FSFChainConfig& ChainConfig = ChainConfigs[ChainIndex];
 	CurrentDamageMultiplier = ChainConfig.DamageMultiplier;
 
@@ -165,8 +204,57 @@ void USFGA_ChainedSkill_Melee::OnChainMontageInterrupted()
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
+void USFGA_ChainedSkill_Melee::BindComboStateRemovedDelegate()
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+    
+	if (!ASC || ComboStateRemovedHandle.IsValid() || !ComboStateEffectClass)
+	{
+		return;
+	}
+	ComboStateRemovedHandle = ASC->OnAnyGameplayEffectRemovedDelegate().AddUObject(this, &ThisClass::OnComboStateRemoved);
+}
+
+void USFGA_ChainedSkill_Melee::UnbindComboStateRemovedDelegate()
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+    
+	if (ASC && ComboStateRemovedHandle.IsValid())
+	{
+		ASC->OnAnyGameplayEffectRemovedDelegate().Remove(ComboStateRemovedHandle);
+		ComboStateRemovedHandle.Reset();
+	}
+}
+
+void USFGA_ChainedSkill_Melee::OnComboStateRemoved(const FActiveGameplayEffect& RemovedEffect)
+{
+	// 인터페이스의 핵심 로직 호출
+	if (HandleComboStateRemoved(this, RemovedEffect))
+	{
+		UnbindComboStateRemovedDelegate();
+	}
+}
+
 void USFGA_ChainedSkill_Melee::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+	if (ASC)
+	{
+		// ComboState가 남아있으면 델리게이트 유지 (타임아웃 감지 필요)
+		bool bHasComboState = ComboStateEffectClass && ASC->GetGameplayEffectCount(ComboStateEffectClass, ASC) > 0;
+		if (!bHasComboState)
+		{
+			// ComboState 없음 = CompleteCombo 완료
+			UnbindComboStateRemovedDelegate();
+		}
+
+		if (CooldownGEAddedHandle.IsValid())
+		{
+			ASC->OnActiveGameplayEffectAddedDelegateToSelf.Remove(CooldownGEAddedHandle);
+			CooldownGEAddedHandle.Reset();
+		}
+	}
+
 	RestoreSlidingMode();
 	ExecutingChainIndex = 0;
 	CurrentDamageMultiplier = 1.0f;
@@ -213,6 +301,12 @@ void USFGA_ChainedSkill_Melee::TryProcCooldownReset_FromASC(UAbilitySystemCompon
 
 	AActor* OwnerActor = ASC->GetOwner();
 	if (!OwnerActor || !OwnerActor->HasAuthority())
+	{
+		return;
+	}
+
+	// 패시브 없으면 패스
+	if (!ASC->HasMatchingGameplayTag(SFGameplayTags::Ability_Skill_Passive_CooldownReset))
 	{
 		return;
 	}

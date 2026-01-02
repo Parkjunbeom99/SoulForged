@@ -10,10 +10,12 @@
 #include "InputMappingContext.h"
 #include "Components/GameFrameworkInitStateInterface.h"
 #include "Components/SFDeathUIComponent.h"
+#include "Components/SFSharedUIComponent.h"
 #include "Components/SFSpectatorComponent.h"
 #include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
 #include "Pawn/SFSpectatorPawn.h"
+#include "System/SFPlayFabSubsystem.h"
 #include "UI/InGame/SFIndicatorWidgetBase.h"
 
 ASFPlayerController::ASFPlayerController(const FObjectInitializer& ObjectInitializer)
@@ -22,6 +24,7 @@ ASFPlayerController::ASFPlayerController(const FObjectInitializer& ObjectInitial
 	LoadingCheckComponent = CreateDefaultSubobject<USFLoadingCheckComponent>(TEXT("LoadingCheckComponent"));
 	SpectatorComponent = CreateDefaultSubobject<USFSpectatorComponent>(TEXT("SpectatorComponent"));
 	DeathUIComponent = CreateDefaultSubobject<USFDeathUIComponent>(TEXT("DeathUIComponent"));
+	SharedUIComponent = CreateDefaultSubobject<USFSharedUIComponent>(TEXT("SharedUIComponent"));
 }
 
 void ASFPlayerController::BeginPlay()
@@ -125,16 +128,22 @@ void ASFPlayerController::PlayerTick(float DeltaTime)
 	}
 
 	// 일반 캐릭터 조종 중
-	if (SFPS)
+	if (SFPS && IsLocalController())
 	{
-		if (IsLocalController())
-		{
-			// 내 화면의 정확한 회전값 가져오기
-			FRotator MyViewRotation = GetControlRotation(); 
+		FRotator MyViewRotation = GetControlRotation();
+		
+		// [Client Local] 로컬 예측을 위해 내 변수 즉시 업데이트 (반응성)
+		SFPS->SetReplicatedViewRotation(MyViewRotation);
 
-			// [Client Local] 로컬 예측을 위해 내 변수 즉시 업데이트 (반응성)
-			SFPS->SetReplicatedViewRotation(MyViewRotation);
+		// 서버 전송 최적화: 변경 감지 + 빈도 제한
+		const float CurrentTime = GetWorld()->GetTimeSeconds();
+		const bool bRotationChanged = !MyViewRotation.Equals(LastSentViewRotation, ViewRotationThreshold);
+		const bool bEnoughTimePassed = (CurrentTime - LastViewRotationSendTime) >= ViewRotationSendInterval;
+		if (bRotationChanged && bEnoughTimePassed)
+		{
 			Server_UpdateViewRotation(MyViewRotation);
+			LastSentViewRotation = MyViewRotation;
+			LastViewRotationSendTime = CurrentTime;
 		}
 	}
 }
@@ -270,6 +279,41 @@ void ASFPlayerController::CreateTeammateIndicators()
 			TeammateWidgetMap.Add(Actor, NewIndicator);
 			
 			UE_LOG(LogTemp, Log, TEXT("Team Indicator Created for: %s"), *Actor->GetName());
+		}
+	}
+}
+
+void ASFPlayerController::Server_SendPermanentUpgradeData_Implementation(const FSFPermanentUpgradeData& InData)
+{
+	ASFPlayerState* PS = GetPlayerState<ASFPlayerState>();
+	if (!PS)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[PermanentUpgrade] Server_SendPermanentUpgradeData: PS null"));
+		return;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[PermanentUpgrade] Server received data from PC. Wrath=%d Pride=%d Lust=%d Sloth=%d Greed=%d"),
+		InData.Wrath, InData.Pride, InData.Lust, InData.Sloth, InData.Greed);
+
+	PS->SetPermanentUpgradeData(InData);   // 여기서 bReceived=true & TryApply로 이어지게
+}
+
+// SFPlayerController.cpp
+void ASFPlayerController::Client_BeginPermanentUpgradeFlow_Implementation()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (USFPlayFabSubsystem* PF = GI->GetSubsystem<USFPlayFabSubsystem>())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[PermanentUpgrade][Client] Begin flow"));
+
+			PF->ResetPermanentUpgradeSendState();
+			PF->StartRetrySendPermanentUpgradeDataToServer();
 		}
 	}
 }

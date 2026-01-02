@@ -2,12 +2,16 @@
 
 #include "BTService_UpdateTarget.h"
 
+#include "AbilitySystemComponent.h"
 #include "AIController.h"
 #include "AI/Controller/SFEnemyController.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISense_Sight.h"
 #include "GameFramework/Pawn.h"
+#include "AbilitySystemGlobals.h"
+#include "Character/SFCharacterGameplayTags.h"
+#include "Character/Enemy/SFEnemyGameplayTags.h"
 
 UBTService_UpdateTarget::UBTService_UpdateTarget()
 {
@@ -19,7 +23,7 @@ UBTService_UpdateTarget::UBTService_UpdateTarget()
 	HasTargetKey.AddBoolFilter(this, GET_MEMBER_NAME_CHECKED(UBTService_UpdateTarget, HasTargetKey));
 }
 
-float UBTService_UpdateTarget::CalculateTargetScore(UBehaviorTreeComponent& OwnerComp, AActor* Target, ASFEnemyController* AIController) const
+float UBTService_UpdateTarget::CalculateTargetScore(UBehaviorTreeComponent& OwnerComp, AActor* Target, ASFBaseAIController* AIController) const
 {
 	if (!Target || !AIController) return -1.f;
 	APawn* ControlledPawn = AIController->GetPawn();
@@ -34,10 +38,22 @@ void UBTService_UpdateTarget::TickNode(UBehaviorTreeComponent& OwnerComp, uint8*
 {
 	Super::TickNode(OwnerComp, NodeMemory, DeltaSeconds);
 
-	ASFEnemyController* AIController = Cast<ASFEnemyController>(OwnerComp.GetAIOwner());
+	ASFBaseAIController* AIController = Cast<ASFBaseAIController>(OwnerComp.GetAIOwner());
 	if (!AIController) return;
 
+	// Ability 사용 중에는 타겟 업데이트 스킵
 	APawn* MyPawn = AIController->GetPawn();
+	if (MyPawn)
+	{
+		if (UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(MyPawn))
+		{
+			if (ASC->HasMatchingGameplayTag(SFGameplayTags::Character_State_UsingAbility))
+			{
+				return;
+			}
+		}
+	}
+	
 	if (!MyPawn) return;
 
 	UBlackboardComponent* BlackboardComp = OwnerComp.GetBlackboardComponent();
@@ -60,7 +76,7 @@ void UBTService_UpdateTarget::TickNode(UBehaviorTreeComponent& OwnerComp, uint8*
 			//  CombatComponent도 클리어
 			if (AIController->CombatComponent && CurrentTarget)
 			{
-				AIController->CombatComponent->HandleTargetPerceptionUpdated(CurrentTarget, false);
+				//AIController->CombatComponent->HandleTargetPerceptionUpdated(CurrentTarget, false);
 			}
 
 			// 타겟을 지웠으니 이번 틱 종료
@@ -126,7 +142,7 @@ void UBTService_UpdateTarget::TickNode(UBehaviorTreeComponent& OwnerComp, uint8*
 			//  CombatComponent도 업데이트 (UpdateDesiredControlYaw가 올바른 타겟 사용)
 			if (AIController->CombatComponent)
 			{
-				AIController->CombatComponent->HandleTargetPerceptionUpdated(CurrentTarget, true);
+				//
 			}
 
 			// [중요] 타겟을 새로 찾았을 때만 LastKnownPosition 업데이트 (추격용)
@@ -152,7 +168,7 @@ void UBTService_UpdateTarget::TickNode(UBehaviorTreeComponent& OwnerComp, uint8*
 			//  CombatComponent도 클리어
 			if (AIController->CombatComponent && CurrentTarget)
 			{
-				AIController->CombatComponent->HandleTargetPerceptionUpdated(CurrentTarget, false);
+				//
 			}
 
 			return;

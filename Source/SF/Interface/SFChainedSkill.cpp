@@ -1,6 +1,8 @@
 #include "SFChainedSkill.h"
 
 #include "AbilitySystemComponent.h"
+#include "AbilitySystemGlobals.h"
+#include "AbilitySystem/GameplayEvent/SFGameplayEventTags.h"
 #include "GameFramework/GameplayMessageSubsystem.h"
 #include "Messages/SFMessageGameplayTags.h"
 #include "Messages/SFSkillInfoMessages.h"
@@ -72,7 +74,39 @@ void ISFChainedSkill::RemoveComboState(UGameplayAbility* SourceAbility)
 	}
 }
 
-bool ISFChainedSkill::ApplyChainCost(int32 ChainIndex, UGameplayAbility* SourceAbility)
+bool ISFChainedSkill::HandleComboStateRemoved(UGameplayAbility* SourceAbility, const FActiveGameplayEffect& RemovedEffect)
+{
+	TSubclassOf<UGameplayEffect> ComboStateClass = GetComboStateEffectClass();
+	if (!ComboStateClass)
+	{
+		return false;
+	}
+    
+	// ComboState GE인지 확인
+	if (RemovedEffect.Spec.Def->GetClass() != ComboStateClass)
+	{
+		return false;
+	}
+
+	UAbilitySystemComponent* ASC = GetChainASC();
+	if (!ASC)
+	{
+		return false;
+	}
+
+	// 쿨다운이 이미 적용되어 있으면 스킵 (CompleteCombo에서 이미 처리됨)
+	FGameplayTagContainer CDTags = GetChainedSkillCooldownTags();
+	if (CDTags.Num() > 0 && ASC->HasAnyMatchingGameplayTags(CDTags))
+	{
+		return false;
+	}
+
+	// 타임아웃 쿨다운 적용
+	ApplyTimeoutCooldown(SourceAbility);
+	return true;
+}
+
+bool ISFChainedSkill::CheckChainCost(int32 ChainIndex, UAbilitySystemComponent* ASC, float AbilityLevel, const FGameplayEffectContextHandle& ContextHandle, FGameplayTagContainer* OptionalRelevantTags) const
 {
 	const TArray<FSFChainConfig>& Configs = GetChainConfigs();
 	if (!Configs.IsValidIndex(ChainIndex))
@@ -86,19 +120,45 @@ bool ISFChainedSkill::ApplyChainCost(int32 ChainIndex, UGameplayAbility* SourceA
 		return true;
 	}
 
-	UAbilitySystemComponent* ASC = GetChainASC();
-	if (!ASC || !SourceAbility)
+	if (!ASC)
 	{
 		return false;
 	}
 
-	FGameplayEffectSpecHandle CostSpec = SourceAbility->MakeOutgoingGameplayEffectSpec(ChainConfig.CostEffect);
-	if (CostSpec.IsValid())
+	UGameplayEffect* CostGE = ChainConfig.CostEffect.GetDefaultObject();
+	if (!CostGE)
 	{
-		FActiveGameplayEffectHandle Handle = ASC->ApplyGameplayEffectSpecToSelf(*CostSpec.Data.Get());
-		return Handle.IsValid();
+		return true;
 	}
-	return false;
+
+	if (!ASC->CanApplyAttributeModifiers(CostGE, AbilityLevel, ContextHandle))
+	{
+		const FGameplayTag& CostTag = UAbilitySystemGlobals::Get().ActivateFailCostTag;
+		if (OptionalRelevantTags && CostTag.IsValid())
+		{
+			OptionalRelevantTags->AddTag(CostTag);
+		}
+		return false;
+	}
+
+	return true;
+}
+
+UGameplayEffect* ISFChainedSkill::GetChainCostEffect(int32 ChainIndex) const
+{
+	const TArray<FSFChainConfig>& Configs = GetChainConfigs();
+	if (!Configs.IsValidIndex(ChainIndex))
+	{
+		return nullptr;
+	}
+
+	const FSFChainConfig& ChainConfig = Configs[ChainIndex];
+	if (!ChainConfig.CostEffect)
+	{
+		return nullptr;
+	}
+
+	return ChainConfig.CostEffect.GetDefaultObject();
 }
 
 void ISFChainedSkill::ApplyChainEffects(int32 ChainIndex, UGameplayAbility* SourceAbility)
@@ -155,18 +215,35 @@ void ISFChainedSkill::RemoveChainEffects()
 
 void ISFChainedSkill::CompleteCombo(UGameplayAbility* SourceAbility)
 {
-	RemoveComboState(SourceAbility);
+	// Complete 쿨다운 적용 (SetByCaller 방식)
+	ApplyChainCooldownInternal(SourceAbility, GetCompleteCooldownEffectClass(), GetCompleteCooldownDuration());
 
+	// OnComboStateRemoved 콜백에서 쿨다운 체크 시 이미 적용되어 있으므로 타임아웃 쿨타임 충돌x
+	RemoveComboState(SourceAbility);
+}
+
+void ISFChainedSkill::ApplyTimeoutCooldown(UGameplayAbility* SourceAbility)
+{
+	ApplyChainCooldownInternal(SourceAbility, GetTimeoutCooldownEffectClass(), GetTimeoutCooldownDuration());
+}
+
+void ISFChainedSkill::ApplyChainCooldownInternal(UGameplayAbility* SourceAbility, TSubclassOf<UGameplayEffect> CooldownGEClass, float Duration)
+{
 	UAbilitySystemComponent* ASC = GetChainASC();
-	TSubclassOf<UGameplayEffect> CooldownClass = GetCompleteCooldownEffectClass();
-        
-	if (ASC && SourceAbility && CooldownClass)
+	if (!ASC || !SourceAbility || !CooldownGEClass || Duration <= 0.f)
 	{
-		FGameplayEffectSpecHandle CooldownSpec = SourceAbility->MakeOutgoingGameplayEffectSpec(CooldownClass);
-		if (CooldownSpec.IsValid())
-		{
-			ASC->ApplyGameplayEffectSpecToSelf(*CooldownSpec.Data.Get());
-		}
+		return;
+	}
+
+	FGameplayEffectContextHandle ContextHandle = ASC->MakeEffectContext();
+	ContextHandle.AddSourceObject(SourceAbility);
+	FGameplayEffectSpecHandle SpecHandle = ASC->MakeOutgoingSpec(CooldownGEClass, GetChainAbilityLevel(), ContextHandle);
+
+	if (SpecHandle.IsValid())
+	{
+		// SetByCaller로 기본 쿨타임 전달 → USFCooldownCalculation에서 CooldownRate 적용
+		SpecHandle.Data->SetSetByCallerMagnitude(SFGameplayTags::Data_Cooldown_Base, Duration);
+		ASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
 	}
 }
 

@@ -24,6 +24,12 @@ namespace SFGameplayTags
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayEvent_Revived);
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayEvent_Downed);
 
+	// Turn In Place Events
+	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayEvent_Turn_90L);
+	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayEvent_Turn_90R);
+	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayEvent_Turn_180L);
+	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayEvent_Turn_180R);
+
 	//Damage Events
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayEvent_Damage_Critical);
     
@@ -73,7 +79,17 @@ namespace SFGameplayTags
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Enemy_SightRadius);
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Enemy_LoseSightRadius);
 
+	// --- Hero Attribute Data ---
+	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Hero_ManaRegen);
+	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Hero_StaminaRegen);
+	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Hero_CooldownReduction);
+	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Hero_Luck);
+
+	// Cooldown
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Cooldown_Base);
+	
 	// Cost
+	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Cost_Stamina);
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Cost_DodgeStamina);
 
 	// Stage

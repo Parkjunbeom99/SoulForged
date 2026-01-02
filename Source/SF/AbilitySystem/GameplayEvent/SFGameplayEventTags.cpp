@@ -23,6 +23,12 @@ namespace SFGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(GameplayEvent_Revived, "GameplayEvent.Revived");
 	UE_DEFINE_GAMEPLAY_TAG(GameplayEvent_Downed, "GameplayEvent.Downed");
 
+	// Turn In Place Events
+	UE_DEFINE_GAMEPLAY_TAG(GameplayEvent_Turn_90L, "GameplayEvent.Turn.90L");
+	UE_DEFINE_GAMEPLAY_TAG(GameplayEvent_Turn_90R, "GameplayEvent.Turn.90R");
+	UE_DEFINE_GAMEPLAY_TAG(GameplayEvent_Turn_180L, "GameplayEvent.Turn.180L");
+	UE_DEFINE_GAMEPLAY_TAG(GameplayEvent_Turn_180R, "GameplayEvent.Turn.180R");
+
 	// Damage Events
 	UE_DEFINE_GAMEPLAY_TAG(GameplayEvent_Damage_Critical, "GameplayEvent.Damage.Critical");
     
@@ -72,7 +78,17 @@ namespace SFGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Data_Enemy_SightRadius, "Data.Attribute.Enemy.SightRadius");
 	UE_DEFINE_GAMEPLAY_TAG(Data_Enemy_LoseSightRadius, "Data.Attribute.Enemy.LoseSightRadius");
 
+	// Hero 전용 속성
+	UE_DEFINE_GAMEPLAY_TAG(Data_Hero_ManaRegen, "Data.Attribute.Hero.ManaRegen");
+	UE_DEFINE_GAMEPLAY_TAG(Data_Hero_StaminaRegen, "Data.Attribute.Hero.StaminaRegen");
+	UE_DEFINE_GAMEPLAY_TAG(Data_Hero_CooldownReduction, "Data.Attribute.Hero.CooldownReduction");
+	UE_DEFINE_GAMEPLAY_TAG(Data_Hero_Luck, "Data.Attribute.Hero.Luck");
+
+	// Cooldown
+	UE_DEFINE_GAMEPLAY_TAG(Data_Cooldown_Base, "Data.Cooldown.Base");
+
 	// Cost
+	UE_DEFINE_GAMEPLAY_TAG(Data_Cost_Stamina, "Data.Cost.Stamina");
 	UE_DEFINE_GAMEPLAY_TAG(Data_Cost_DodgeStamina, "Data.Cost.DodgeStamina");
 
 	// Stage

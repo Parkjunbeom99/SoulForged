@@ -4,11 +4,13 @@
 #include "AIController.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "Abilities/GameplayAbilityTargetActor.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Character/SFCharacterGameplayTags.h"
 #include "AbilitySystem/Abilities/Enemy/Combat/SFGA_Enemy_BaseAttack.h"
 
-UUSFBTTask_ExecuteAbilityByTag::UUSFBTTask_ExecuteAbilityByTag( const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+UUSFBTTask_ExecuteAbilityByTag::UUSFBTTask_ExecuteAbilityByTag(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
 {
     NodeName = "Execute Ability By Tag";
     bNotifyTick = false;
@@ -20,7 +22,7 @@ UAbilitySystemComponent* UUSFBTTask_ExecuteAbilityByTag::GetASC(UBehaviorTreeCom
 {
     if (AAIController* AIController = OwnerComp.GetAIOwner())
     {
-        return UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent( AIController->GetPawn());
+        return UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(AIController->GetPawn());
     }
     return nullptr;
 }
@@ -29,16 +31,21 @@ EBTNodeResult::Type UUSFBTTask_ExecuteAbilityByTag::ExecuteTask(
     UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
     CachedOwnerComp = &OwnerComp;
-    
+
+    // 1. ASC 검증
     UAbilitySystemComponent* ASC = GetASC(OwnerComp);
     if (!ASC)
     {
         return EBTNodeResult::Failed;
     }
 
-    const FName AbilityTagName = OwnerComp.GetBlackboardComponent()->GetValueAsName(
-        AbilityTagKey.SelectedKeyName);
-    
+    UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
+    if (!BB)
+    {
+        return EBTNodeResult::Failed;
+    }
+
+    const FName AbilityTagName = BB->GetValueAsName(AbilityTagKey.SelectedKeyName);
     if (!AbilityTagName.IsValid())
     {
         return EBTNodeResult::Failed;
@@ -50,23 +57,45 @@ EBTNodeResult::Type UUSFBTTask_ExecuteAbilityByTag::ExecuteTask(
         return EBTNodeResult::Failed;
     }
 
-    // 실행 가능한 어빌리티 찾기
+    // AbilityTags와 AssetTags 모두 검색
     TArray<FGameplayAbilitySpec*> Specs;
     ASC->GetActivatableGameplayAbilitySpecsByAllMatchingTags(
         FGameplayTagContainer(AbilityTag), Specs, true);
 
+    // AbilityTags에서 못 찾으면 AssetTags에서 검색
     if (Specs.Num() == 0)
     {
+        for (FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+        {
+            if (Spec.Ability && Spec.Ability->AbilityTags.HasTag(AbilityTag))
+            {
+                Specs.Add(&Spec);
+            }
+        }
+    }
 
+    if (Specs.Num() == 0)
+    {
         return EBTNodeResult::Failed;
     }
 
-    // 사용 가능한 첫 번째 어빌리티 활성화 시도
+    // [최적화] 쿨다운만 체크하고 바로 실행
+    // - CanActivateAbility는 내부적으로 사거리/각도 체크 안 함 (이미 SelectAbility에서 검증됨)
+    // - 쿨다운만 확인하고 즉시 실행
     bool bActivated = false;
+    const FGameplayAbilityActorInfo* ActorInfo = ASC->AbilityActorInfo.Get();
+
     for (FGameplayAbilitySpec* Spec : Specs)
     {
-        if (!Spec) continue;
-        
+        if (!Spec || !Spec->Ability) continue;
+
+        // 쿨다운 체크만 수행
+        if (!Spec->Ability->CheckCooldown(Spec->Handle, ActorInfo))
+        {
+            continue;  // 쿨다운 중이면 스킵
+        }
+
+        // 쿨다운 OK면 바로 실행
         if (ASC->TryActivateAbility(Spec->Handle))
         {
             ExecutingAbilityHandle = Spec->Handle;
@@ -79,7 +108,8 @@ EBTNodeResult::Type UUSFBTTask_ExecuteAbilityByTag::ExecuteTask(
     {
         return EBTNodeResult::Failed;
     }
-    
+
+    // Ability 종료 델리게이트 등록
     AbilityEndedHandle = ASC->OnAbilityEnded.AddUObject(this, &UUSFBTTask_ExecuteAbilityByTag::OnAbilityEnded);
 
     return EBTNodeResult::InProgress;
@@ -87,7 +117,7 @@ EBTNodeResult::Type UUSFBTTask_ExecuteAbilityByTag::ExecuteTask(
 
 void UUSFBTTask_ExecuteAbilityByTag::OnAbilityEnded(const FAbilityEndedData& EndedData)
 {
-   
+
     if (EndedData.AbilitySpecHandle != ExecutingAbilityHandle)
         return;
 
@@ -95,19 +125,24 @@ void UUSFBTTask_ExecuteAbilityByTag::OnAbilityEnded(const FAbilityEndedData& End
         return;
 
     UBehaviorTreeComponent* OwnerComp = CachedOwnerComp.Get();
-    
+
     CleanupDelegates(*OwnerComp);
     
-    // 어빌리티가 취소되었는지 정상 완료되었는지 체크
+    
+    if (UBlackboardComponent* BB = OwnerComp->GetBlackboardComponent())
+    {
+        BB->ClearValue(AbilityTagKey.SelectedKeyName);
+    }
+    
     if (EndedData.bWasCancelled)
     {
+     
         FinishLatentTask(*OwnerComp, EBTNodeResult::Failed);
     }
     else
     {
         FinishLatentTask(*OwnerComp, EBTNodeResult::Succeeded);
     }
-    
 }
 
 EBTNodeResult::Type UUSFBTTask_ExecuteAbilityByTag::AbortTask(
