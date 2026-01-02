@@ -37,6 +37,9 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	UCommonButtonBase* QuitGameButton;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI|GameFlow")
+	TSubclassOf<UUserWidget> OptionsWidgetClass;
+
 	UFUNCTION()
 	void OnResumeClicked();
 

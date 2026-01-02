@@ -38,6 +38,12 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI|GameFlow")
 	TSubclassOf<UUserWidget> SearchLobbyWidgetClass;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI|GameFlow")
+	TSubclassOf<UUserWidget> OptionsWidgetClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI|GameFlow")
+	TSubclassOf<UUserWidget> CreditsWidgetClass;
+
 	// ------------- Function -------------
 	UFUNCTION()
 	void OnNewGameClicked();

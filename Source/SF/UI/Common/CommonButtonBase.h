@@ -24,6 +24,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI|Common")
 	FText ButtonTitle;
 
+	// 폰트 크기 조절용 변수 (0이면 기본값 사용, 0보다 크면 이 값으로 덮어씌움)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI|Common", meta = (ClampMin = "0"))
+	int32 FontSizeOverride = 0;
+
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> Btn_Clickable;
 
