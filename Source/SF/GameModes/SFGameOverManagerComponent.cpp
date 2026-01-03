@@ -1,5 +1,6 @@
 #include "SFGameOverManagerComponent.h"
 
+#include "SFGameMode.h"
 #include "SFLogChannels.h"
 #include "SFStageManagerComponent.h"
 #include "Character/Hero/SFHeroDefinition.h"
@@ -299,19 +300,10 @@ void USFGameOverManagerComponent::TravelToLobby()
 
 	bWaitingForLobbyTransition = false;
 
-    if (LobbyLevel.IsNull())
-    {
-        UE_LOG(LogSF, Error, TEXT("[GameOverManager] LobbyLevel is not set!"));
-        return;
-    }
-
-    UE_LOG(LogSF, Log, TEXT("[GameOverManager] Traveling to lobby: %s"), *LobbyLevel.ToString());
-
-    if (UWorld* World = GetWorld())
-    {
-        const FString LobbyURL = LobbyLevel.GetLongPackageName();
-        World->ServerTravel(LobbyURL + TEXT("?listen"), true);
-    }
+	if (ASFGameMode* GameMode = GetWorld()->GetAuthGameMode<ASFGameMode>())
+	{
+		GameMode->RequestTravelToLobby(LobbyLevel);
+	}
 }
 
 

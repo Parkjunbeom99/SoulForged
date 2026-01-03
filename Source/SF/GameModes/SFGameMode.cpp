@@ -410,11 +410,6 @@ void ASFGameMode::NotifyStageClear()
 
 void ASFGameMode::RequestTravelToNextStage(TSoftObjectPtr<UWorld> NextStageLevel)
 {
-	if (!HasAuthority())
-	{
-		return;
-	}
-
 	if (NextStageLevel.IsNull())
 	{
 		UE_LOG(LogSF, Error, TEXT("[GameMode] NextStageLevel is not set!"));
@@ -440,6 +435,24 @@ void ASFGameMode::RequestTravelToNextStage(TSoftObjectPtr<UWorld> NextStageLevel
 	if (USFGameInstance* SFGameInstance = Cast<USFGameInstance>(GetWorld()->GetGameInstance()))
 	{
 		SFGameInstance->LoadLevelAndListen(NextStageLevel);
+	}
+}
+
+void ASFGameMode::RequestTravelToLobby(TSoftObjectPtr<UWorld> LobbyLevel)
+{
+	if (LobbyLevel.IsNull())
+	{
+		UE_LOG(LogSF, Error, TEXT("[GameMode] LobbyLevel is not set!"));
+		return;
+	}
+
+	// TODO : 로비 이동전 필요한 플레이어별 획득한 데이터 처리?
+
+	UE_LOG(LogSF, Log, TEXT("[GameMode] Traveling to lobby: %s"), *LobbyLevel.ToString());
+
+	if (USFGameInstance* SFGameInstance = Cast<USFGameInstance>(GetWorld()->GetGameInstance()))
+	{
+		SFGameInstance->LoadLevelAndListen(LobbyLevel);
 	}
 }
 
