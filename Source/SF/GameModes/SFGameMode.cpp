@@ -592,5 +592,5 @@ bool ASFGameMode::IsBossStage() const
 
 void ASFGameMode::OnGameOver()
 {
-	// TODO : 통계 저장 및 일정 시간 후 로비 이동 처리?
+	// TODO : AI 비활성화, 게임플레이 시스템 정지, 서버 전용 정리 작업
 }
