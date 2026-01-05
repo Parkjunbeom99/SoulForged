@@ -10,7 +10,8 @@
 #include "Libraries/SFAbilitySystemLibrary.h"
 #include "Player/SFPlayerState.h"
 #include "Player/Components/SFPlayerStatsComponent.h"
-
+#include "GameFramework/GameplayMessageSubsystem.h"
+#include "UI/InGame/UIDataStructs.h"
 
 USFPrimarySet::USFPrimarySet()
 {
@@ -96,6 +97,18 @@ void USFPrimarySet::PostGameplayEffectExecute(const FGameplayEffectModCallbackDa
         // Apply damage
         const float NewHealth = GetHealth() - DamageDone;
         SetHealth(NewHealth);
+
+        // [UI] 데미지 폰트 띄우기 메시지
+        if (DamageDone > 0.0f)
+        {
+            FSFDamageMessageInfo Message;
+            Message.TargetActor = GetOwningActor();
+            Message.DamageAmount = DamageDone;
+            Message.Instigator = Data.EffectSpec.GetEffectContext().GetInstigator();
+
+            UGameplayMessageSubsystem& MessageSubsystem = UGameplayMessageSubsystem::Get(GetWorld());
+            MessageSubsystem.BroadcastMessage(FGameplayTag::RequestGameplayTag("UI.Event.Damage"), Message);
+        }
         
         if (NewHealth > 0)
         {
