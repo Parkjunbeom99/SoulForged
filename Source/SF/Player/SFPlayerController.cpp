@@ -6,14 +6,12 @@
 #include "Components/SFLoadingCheckComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "EnhancedInputComponent.h"
-#include "EnhancedInputSubsystems.h"
-#include "InputMappingContext.h"
-#include "Components/WidgetComponent.h"
 #include "Character/Enemy/Component/SFEnemyWidgetComponent.h"
 #include "Components/GameFrameworkInitStateInterface.h"
 #include "Components/SFDeathUIComponent.h"
 #include "Components/SFSharedUIComponent.h"
 #include "Components/SFSpectatorComponent.h"
+#include "UI/Compoent/SFInGameMenuComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/Character.h"
 #include "GameModes/SFGameOverManagerComponent.h"
@@ -31,6 +29,8 @@ ASFPlayerController::ASFPlayerController(const FObjectInitializer& ObjectInitial
 	SpectatorComponent = CreateDefaultSubobject<USFSpectatorComponent>(TEXT("SpectatorComponent"));
 	DeathUIComponent = CreateDefaultSubobject<USFDeathUIComponent>(TEXT("DeathUIComponent"));
 	SharedUIComponent = CreateDefaultSubobject<USFSharedUIComponent>(TEXT("SharedUIComponent"));
+
+	InGameMenuComponent = CreateDefaultSubobject<USFInGameMenuComponent>(TEXT("SystemMenuComponent"));
 }
 
 void ASFPlayerController::BeginPlay()
@@ -38,14 +38,6 @@ void ASFPlayerController::BeginPlay()
 	Super::BeginPlay();
 	SetInputMode(FInputModeGameOnly());
 	SetShowMouseCursor(false);
-
-	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
-	{
-		if (DefaultMappingContext)
-		{
-			Subsystem->AddMappingContext(DefaultMappingContext, 0);
-		}
-	}
 
 	// 몬스터 데미지 텍스트 관련 리스너 등록 (UI.Event.Damage) -> OnDamageMessageReceived() 실행
 	UGameplayMessageSubsystem& MessageSubsystem = UGameplayMessageSubsystem::Get(this);
@@ -117,15 +109,9 @@ void ASFPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
-	// 기존 InputComponent를 향상된 버전(EnhancedInputComponent)으로 Cast
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
 	{
-		if (InGameMenuAction)
-		{
-			// BindAction: 이 액션이 시작되면(Started) -> ToggleInGameMenu 함수를 실행
-			// ETriggerEvent::Started는 "키를 누르는 순간"
-			EnhancedInputComponent->BindAction(InGameMenuAction, ETriggerEvent::Started, this, &ASFPlayerController::ToggleInGameMenu);
-		}
+		InGameMenuComponent->SetupInputBindings(EnhancedInputComponent);
 	}
 }
 
@@ -192,46 +178,6 @@ void ASFPlayerController::PostProcessInput(const float DeltaTime, const bool bGa
 	
 	Super::PostProcessInput(DeltaTime, bGamePaused);
 
-}
-
-void ASFPlayerController::ToggleInGameMenu()
-{
-	UE_LOG(LogTemp, Warning, TEXT("ESC 키 눌림! ToggleInGameMenu 함수 진입 성공"));
-	
-	// 1. 이미 메뉴가 켜져 있다면? -> 종료
-	if (InGameMenuInstance && InGameMenuInstance->IsInViewport())
-	{
-		InGameMenuInstance->RemoveFromParent();
-		InGameMenuInstance = nullptr;
-
-		SetInputMode(FInputModeGameOnly());
-		bShowMouseCursor = false;
-		return;
-	}
-
-	// 2. 메뉴가 꺼져 있다면? -> 실행
-	if (InGameMenuClass)
-	{
-		InGameMenuInstance = CreateWidget<UUserWidget>(this, InGameMenuClass);
-
-		if (InGameMenuInstance)
-		{
-			// Z-Order 100으로 최상단 배치
-			InGameMenuInstance->AddToViewport(100);
-
-			// 위젯 자체를 포커스 타겟으로 명확히 지정
-			FInputModeUIOnly InputMode;
-			// 위젯이 포커스를 받을 수 있게 설정 
-			InputMode.SetWidgetToFocus(InGameMenuInstance->TakeWidget());
-			// 마우스가 화면 밖으로 나가지 않게 잠금
-			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-			SetInputMode(InputMode);
-			bShowMouseCursor = true;
-
-			InGameMenuInstance->SetKeyboardFocus();
-		}
-	}
-	
 }
 
 void ASFPlayerController::CreateTeammateIndicators()
@@ -398,18 +344,8 @@ void ASFPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 			MessageSubsystem->UnregisterListener(DamageMessageListenerHandle);
 		}
 	}
-
-	// 3. 인게임 메뉴 위젯 정리
-	if (InGameMenuInstance)
-	{
-		if (InGameMenuInstance->IsInViewport())
-		{
-			InGameMenuInstance->RemoveFromParent();
-		}
-		InGameMenuInstance = nullptr;
-	}
-
-	// 4. 팀원 표시 위젯 정리 (Viewport 참조 해제)
+	
+	// 3. 팀원 표시 위젯 정리 (Viewport 참조 해제)
 	for (auto& Elem : TeammateWidgetMap)
 	{
 		if (Elem.Value)

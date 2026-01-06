@@ -11,6 +11,7 @@
 class USFSharedUIComponent;
 class USFDeathUIComponent;
 class USFSpectatorComponent;
+class USFInGameMenuComponent;
 struct FSFStageInfo;
 class USFSkillSelectionScreen;
 class USFLoadingCheckComponent;
@@ -18,8 +19,6 @@ class ASFPlayerState;
 class USFAbilitySystemComponent;
 class UUserWidget;
 class USFDamageWidget;
-class UInputAction;
-class UInputMappingContext;
 
 /**
  * 
@@ -67,9 +66,6 @@ protected:
 	
 	UFUNCTION(Server, Unreliable)
 	void Server_UpdateViewRotation(FRotator NewRotation);
-
-	// 인게임 메뉴 생성 함수
-	void ToggleInGameMenu();
 	
 	// 팀원 위젯 생성 함수
 	void CreateTeammateIndicators();
@@ -88,22 +84,6 @@ protected:
 	void Server_NotifyReadyForLobby();
 
 protected:
-	// ----------------[추가] 인게임 메뉴 관련 변수 및 함수----------------------
-
-	// 에디터 상에서 지정할 IA_InGameMenu 변수
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Input")
-	TObjectPtr<UInputAction> InGameMenuAction;
-
-	// 에디터 상에서 지정할 IMC 변수
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Input")
-	TObjectPtr<UInputMappingContext> DefaultMappingContext;
-	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI|InGame")
-	TSubclassOf<UUserWidget> InGameMenuClass;
-
-	UPROPERTY()
-	TObjectPtr<UUserWidget> InGameMenuInstance;
-
 	// 팀원 표시 위젯 클래스
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI|InGame")
 	TSubclassOf<UUserWidget> TeammateIndicatorWidgetClass;
@@ -127,6 +107,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SF|Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USFSharedUIComponent> SharedUIComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SF|Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USFInGameMenuComponent> InGameMenuComponent; 
 
 private:
 	// ViewRotation 전송 최적화 
