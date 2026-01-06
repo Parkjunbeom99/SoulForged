@@ -103,10 +103,7 @@ public:
     // 지정된 등급으로 아이템 추가(상점 구매, 퀘스트 보상 등)
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Inventory")
     int32 TryAddItem(int32 ItemID, const FGameplayTag& RarityTag, int32 ItemCount);
-
-    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Inventory")
-    int32 TryAddItemByClass(TSubclassOf<USFItemDefinition> ItemClass, const FGameplayTag& RarityTag, int32 ItemCount);
-
+    
     // 간단한 보상 지급 (드롭 테이블 없이)
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Inventory")
     int32 TryAddItemWithRandomRarity(int32 ItemID, float LuckValue, int32 ItemCount);
@@ -117,10 +114,7 @@ public:
     // 아이템 제거
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Inventory")
     bool TryRemoveItem(int32 ItemID, int32 ItemCount);
-
-    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Inventory")
-    bool TryRemoveItemByClass(TSubclassOf<USFItemDefinition> ItemClass, int32 ItemCount);
-
+    
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Inventory")
     bool TryRemoveItemAt(int32 SlotIndex, int32 ItemCount);
     

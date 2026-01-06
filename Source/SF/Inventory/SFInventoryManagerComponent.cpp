@@ -32,9 +32,6 @@ USFItemInstance* FSFInventoryEntry::Clear()
     return RemovedInstance;
 }
 
-//////////////////////////////////////////////////////////////////////////
-// FSFInventoryList
-
 bool FSFInventoryList::NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParams)
 {
     return FFastArraySerializer::FastArrayDeltaSerialize<FSFInventoryEntry, FSFInventoryList>(Entries, DeltaParams, *this);
@@ -64,9 +61,6 @@ void FSFInventoryList::BroadcastChangedMessage(int32 SlotIndex)
         InventoryManager->OnInventoryEntryChanged.Broadcast(SlotIndex, Entry.ItemInstance, Entry.ItemCount);
     }
 }
-
-//////////////////////////////////////////////////////////////////////////
-// USFInventoryManagerComponent
 
 USFInventoryManagerComponent::USFInventoryManagerComponent(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer), InventoryList(this)
@@ -302,17 +296,6 @@ int32 USFInventoryManagerComponent::TryAddItem(int32 ItemID, const FGameplayTag&
     return AddableCount;
 }
 
-int32 USFInventoryManagerComponent::TryAddItemByClass(TSubclassOf<USFItemDefinition> ItemClass, const FGameplayTag& RarityTag, int32 ItemCount)
-{
-    if (!ItemClass)
-    {
-        return 0;
-    }
-
-    const int32 ItemID = USFItemData::Get().FindIdByDefinition(ItemClass.GetDefaultObject());
-    return TryAddItem(ItemID, RarityTag, ItemCount);
-}
-
 int32 USFInventoryManagerComponent::TryAddItemWithRandomRarity(int32 ItemID, float LuckValue, int32 ItemCount)
 {
     const USFItemData& ItemData = USFItemData::Get();
@@ -361,17 +344,6 @@ bool USFInventoryManagerComponent::TryRemoveItem(int32 ItemID, int32 ItemCount)
     return true;
 }
 
-bool USFInventoryManagerComponent::TryRemoveItemByClass(TSubclassOf<USFItemDefinition> ItemClass, int32 ItemCount)
-{
-    if (!ItemClass)
-    {
-        return false;
-    }
-
-    const int32 ItemID = USFItemData::Get().FindIdByDefinition(ItemClass.GetDefaultObject());
-    return TryRemoveItem(ItemID, ItemCount);
-}
-
 bool USFInventoryManagerComponent::TryRemoveItemAt(int32 SlotIndex, int32 ItemCount)
 {
     if (!GetOwner() || !GetOwner()->HasAuthority())
@@ -409,6 +381,11 @@ void USFInventoryManagerComponent::AddItemInternal(int32 SlotIndex, USFItemInsta
     }
     else
     {
+        if (ItemInstance && ItemInstance->GetOuter() != GetOwner())
+        {
+            ItemInstance->Rename(nullptr, GetOwner());
+        }
+        
         Entry.Set(ItemInstance, ItemCount);
 
         if (IsUsingRegisteredSubObjectList() && IsReadyForReplication() && ItemInstance)

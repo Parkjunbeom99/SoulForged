@@ -5,10 +5,34 @@
 #include "Components/ControllerComponent.h"
 #include "SFItemManagerComponent.generated.h"
 
-
 class ASFPickupableItemBase;
 class USFItemInstance;
 class USFInventoryManagerComponent;
+class USFQuickbarComponent;
+
+UENUM(BlueprintType)
+enum class ESFItemSlotType : uint8
+{
+	Inventory,
+	Quickbar
+};
+
+USTRUCT(BlueprintType)
+struct FSFItemSlotHandle
+{
+	GENERATED_BODY()
+
+	FSFItemSlotHandle() : SlotType(ESFItemSlotType::Inventory), SlotIndex(INDEX_NONE) {}
+	FSFItemSlotHandle(ESFItemSlotType InType, int32 InIndex) : SlotType(InType), SlotIndex(InIndex) {}
+
+	UPROPERTY(BlueprintReadWrite, Category = "Item")
+	ESFItemSlotType SlotType = ESFItemSlotType::Inventory;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Item")
+	int32 SlotIndex = INDEX_NONE;
+
+	bool IsValid() const { return SlotIndex != INDEX_NONE; }
+};
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class SF_API USFItemManagerComponent : public UControllerComponent
@@ -19,37 +43,38 @@ public:
 	USFItemManagerComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 public:
-	// ========== 인벤토리 내 이동 ==========
-    
-	// 슬롯 간 이동/병합
-	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Item")
-	void Server_MoveItem(int32 FromSlotIndex, int32 ToSlotIndex);
+	// ========== 통합 Server RPC ==========
 
-	// ========== 아이템 사용 ==========
-    
-	// 소모품 사용
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Item")
-	void Server_UseItem(int32 SlotIndex);
+	void Server_MoveItem(FSFItemSlotHandle FromSlot, FSFItemSlotHandle ToSlot);
 
-	// ========== 아이템 드롭 ==========
-    
-	// 인벤토리에서 월드로 드롭
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Item")
-	void Server_DropItem(int32 SlotIndex, int32 DropCount);
+	void Server_UseItem(FSFItemSlotHandle Slot);
+
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Item")
+	void Server_DropItem(FSFItemSlotHandle Slot);
 
 	// ========== 아이템 픽업 (서버 전용) ==========
-    
+
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Item")
 	bool TryPickupItem(ASFPickupableItemBase* PickupableItem);
 
 protected:
-	// 내부 헬퍼
+
+	void UseConsumableItem(USFItemInstance* ItemInstance, const class USFItemFragment_Consumable* ConsumeFrag, const FSFItemSlotHandle& Slot);
+
+	bool IsValidSlot(const FSFItemSlotHandle& Slot) const;
+	bool IsSlotEmpty(const FSFItemSlotHandle& Slot) const;
+	bool GetSlotInfo(const FSFItemSlotHandle& Slot, USFItemInstance*& OutInstance, int32& OutCount) const;
+	void RemoveFromSlot(const FSFItemSlotHandle& Slot, int32 Count);
+	void AddToSlot(const FSFItemSlotHandle& Slot, USFItemInstance* Instance, int32 Count);
+
 	USFInventoryManagerComponent* GetInventoryManager() const;
+	USFQuickbarComponent* GetQuickbarComponent() const;
 	class UAbilitySystemComponent* GetAbilitySystemComponent() const;
 
-	// 드롭 아이템 스폰
-	bool SpawnDroppedItem(USFItemInstance* ItemInstance, int32 ItemCount);
+	// ========== 내부 헬퍼 ==========
 
-	// 어빌리티 트리거 태그 결정
-	FGameplayTag GetAbilityTriggerTag(const class USFItemFragment_Consumable* ConsumeFrag) const;
+	bool SpawnDroppedItem(USFItemInstance* ItemInstance, int32 ItemCount);
+	FGameplayTag GetConsumeAbilityTriggerTag(const class USFItemFragment_Consumable* ConsumeFrag) const;
 };

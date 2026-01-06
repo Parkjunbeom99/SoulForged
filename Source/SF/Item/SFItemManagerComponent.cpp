@@ -14,6 +14,7 @@
 #include "Item/Fragments/SFItemFragment_Consumable.h"
 #include "Inventory/SFInventoryManagerComponent.h"
 #include "Actors/SFPickupableItemBase.h"
+#include "Inventory/SFQuickbarComponent.h"
 
 USFItemManagerComponent::USFItemManagerComponent(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
@@ -21,166 +22,155 @@ USFItemManagerComponent::USFItemManagerComponent(const FObjectInitializer& Objec
     SetIsReplicatedByDefault(true);
 }
 
-void USFItemManagerComponent::Server_MoveItem_Implementation(int32 FromSlotIndex, int32 ToSlotIndex)
+void USFItemManagerComponent::Server_MoveItem_Implementation(FSFItemSlotHandle FromSlot, FSFItemSlotHandle ToSlot)
 {
     if (!HasAuthority())
     {
         return;
     }
 
-    USFInventoryManagerComponent* InventoryManager = GetInventoryManager();
-    if (!InventoryManager)
+    // 검증
+    if (!IsValidSlot(FromSlot) || !IsValidSlot(ToSlot))
     {
         return;
     }
 
-    // 같은 위치면 무시
-    if (FromSlotIndex == ToSlotIndex)
+    // 같은 슬롯이면 무시
+    if (FromSlot.SlotType == ToSlot.SlotType && FromSlot.SlotIndex == ToSlot.SlotIndex)
     {
         return;
     }
 
-    if (!InventoryManager->IsValidSlotIndex(FromSlotIndex) || !InventoryManager->IsValidSlotIndex(ToSlotIndex))
+    // From이 비어있으면 무시
+    if (IsSlotEmpty(FromSlot))
     {
         return;
     }
 
-    // From 슬롯이 비어있으면 무시
-    if (InventoryManager->IsSlotEmpty(FromSlotIndex))
+    USFItemInstance* FromInstance = nullptr;
+    int32 FromCount = 0;
+    GetSlotInfo(FromSlot, FromInstance, FromCount);
+
+    if (!FromInstance || FromCount <= 0)
     {
         return;
     }
 
-    USFItemInstance* FromInstance = InventoryManager->GetItemInstance(FromSlotIndex);
-    int32 FromCount = InventoryManager->GetItemCount(FromSlotIndex);
-
-    if (InventoryManager->IsSlotEmpty(ToSlotIndex))
+    // ========== To가 비어있는 경우: 이동 ==========
+    if (IsSlotEmpty(ToSlot))
     {
-        // To가 비어있으면 단순 이동
-        InventoryManager->RemoveItemInternal(FromSlotIndex, FromCount);
-        InventoryManager->AddItemInternal(ToSlotIndex, FromInstance, FromCount);
+        RemoveFromSlot(FromSlot, FromCount);
+        AddToSlot(ToSlot, FromInstance, FromCount);
+        return;
     }
-    else
-    {
-        // To에 아이템이 있으면 병합 또는 스왑
-        USFItemInstance* ToInstance = InventoryManager->GetItemInstance(ToSlotIndex);
-        int32 ToCount = InventoryManager->GetItemCount(ToSlotIndex);
 
-        // 같은 아이템 + 같은 등급이면 병합 시도
-        if (FromInstance->GetItemID() == ToInstance->GetItemID() && FromInstance->GetItemRarityTag().MatchesTagExact(ToInstance->GetItemRarityTag()))
+    // ========== To에 아이템이 있는 경우 ==========
+
+    USFItemInstance* ToInstance = nullptr;
+    int32 ToCount = 0;
+    GetSlotInfo(ToSlot, ToInstance, ToCount);
+
+    bool bSameItem = (ToInstance->GetItemID() == FromInstance->GetItemID() && ToInstance->GetItemRarityTag().MatchesTagExact(FromInstance->GetItemRarityTag()));
+    if (bSameItem)
+    {
+        // 같은 아이템: 병합 시도
+        const USFItemDefinition* ItemDef = USFItemData::Get().FindDefinitionById(FromInstance->GetItemID());
+        if (ItemDef)
         {
-            const USFItemDefinition* ItemDef = USFItemData::Get().FindDefinitionById(FromInstance->GetItemID());
-            if (ItemDef && ItemDef->MaxStackCount > 1)
+            int32 Space = ItemDef->MaxStackCount - ToCount;
+            if (Space > 0)
             {
-                int32 Space = ItemDef->MaxStackCount - ToCount;
                 int32 ToMerge = FMath::Min(Space, FromCount);
-
-                if (ToMerge > 0)
-                {
-                    InventoryManager->RemoveItemInternal(FromSlotIndex, ToMerge);
-                    InventoryManager->AddItemInternal(ToSlotIndex, nullptr, ToMerge);
-                }
-                return;
+                RemoveFromSlot(FromSlot, ToMerge);
+                AddToSlot(ToSlot, nullptr, ToMerge);
             }
         }
-
-        // 병합 불가능하면 스왑
-        InventoryManager->RemoveItemInternal(FromSlotIndex, FromCount);
-        InventoryManager->RemoveItemInternal(ToSlotIndex, ToCount);
-        InventoryManager->AddItemInternal(FromSlotIndex, ToInstance, ToCount);
-        InventoryManager->AddItemInternal(ToSlotIndex, FromInstance, FromCount);
+        return;
     }
+
+    // ========== 다른 아이템: 스왑 ==========
+
+    RemoveFromSlot(FromSlot, FromCount);
+    RemoveFromSlot(ToSlot, ToCount);
+
+    AddToSlot(FromSlot, ToInstance, ToCount);
+    AddToSlot(ToSlot, FromInstance, FromCount);
 }
 
-void USFItemManagerComponent::Server_UseItem_Implementation(int32 SlotIndex)
+void USFItemManagerComponent::Server_UseItem_Implementation(FSFItemSlotHandle Slot)
 {
     if (!HasAuthority())
     {
         return;
     }
 
-    USFInventoryManagerComponent* InventoryManager = GetInventoryManager();
-    if (!InventoryManager)
+    if (!IsValidSlot(Slot) || IsSlotEmpty(Slot))
     {
         return;
     }
 
-    if (!InventoryManager->IsValidSlotIndex(SlotIndex) || InventoryManager->IsSlotEmpty(SlotIndex))
+    USFItemInstance* ItemInstance = nullptr;
+    int32 ItemCount = 0;
+    if (!GetSlotInfo(Slot, ItemInstance, ItemCount))
     {
         return;
     }
 
-    USFItemInstance* ItemInstance = InventoryManager->GetItemInstance(SlotIndex);
-    if (!ItemInstance)
+    // ========== Fragment 타입별 분기 ==========
+
+    if (const USFItemFragment_Consumable* ConsumeFrag = ItemInstance->FindFragmentByClass<USFItemFragment_Consumable>())
     {
+        UseConsumableItem(ItemInstance, ConsumeFrag, Slot);
         return;
     }
 
-    // Consumable Fragment 확인
-    const USFItemFragment_Consumable* ConsumeFrag = ItemInstance->FindFragmentByClass<USFItemFragment_Consumable>();
-    if (!ConsumeFrag)
-    {
-        return;
-    }
+    // 추후 다른 타입 추가
+}
 
+void USFItemManagerComponent::UseConsumableItem(USFItemInstance* ItemInstance, const class USFItemFragment_Consumable* ConsumeFrag, const FSFItemSlotHandle& Slot)
+{
     UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
     if (!ASC)
     {
         return;
     }
 
-    // 어빌리티 트리거 태그 결정
-    FGameplayTag TriggerTag = GetAbilityTriggerTag(ConsumeFrag);
+    FGameplayTag TriggerTag = GetConsumeAbilityTriggerTag(ConsumeFrag);
     if (!TriggerTag.IsValid())
     {
         return;
     }
 
-    // GameplayEvent로 어빌리티 활성화
     FGameplayEventData EventData;
     EventData.OptionalObject = ItemInstance;
     EventData.Instigator = GetOwner();
-    EventData.EventMagnitude = static_cast<float>(SlotIndex);  // 슬롯 인덱스 전달
+    EventData.EventMagnitude = static_cast<float>(Slot.SlotIndex);
 
     ASC->HandleGameplayEvent(TriggerTag, &EventData);
-
-    // 아이템 소모는 어빌리티 내에서 성공 시 처리
-    // 어빌리티에서 InventoryManager->TryRemoveItemAt(SlotIndex, 1) 호출
 }
 
-void USFItemManagerComponent::Server_DropItem_Implementation(int32 SlotIndex, int32 DropCount)
+void USFItemManagerComponent::Server_DropItem_Implementation(FSFItemSlotHandle Slot)
 {
     if (!HasAuthority())
     {
         return;
     }
 
-    USFInventoryManagerComponent* InventoryManager = GetInventoryManager();
-    if (!InventoryManager)
+    if (!IsValidSlot(Slot) || IsSlotEmpty(Slot))
     {
         return;
     }
 
-    if (!InventoryManager->IsValidSlotIndex(SlotIndex) || InventoryManager->IsSlotEmpty(SlotIndex))
+    USFItemInstance* ItemInstance = nullptr;
+    int32 ItemCount = 0;
+    if (!GetSlotInfo(Slot, ItemInstance, ItemCount))
     {
         return;
     }
 
-    USFItemInstance* ItemInstance = InventoryManager->GetItemInstance(SlotIndex);
-    int32 CurrentCount = InventoryManager->GetItemCount(SlotIndex);
-
-    if (!ItemInstance || CurrentCount <= 0 || DropCount <= 0)
+    if (SpawnDroppedItem(ItemInstance, ItemCount))
     {
-        return;
-    }
-
-    // 드롭할 수량 조정
-    int32 ActualDropCount = FMath::Min(DropCount, CurrentCount);
-
-    // 드롭 아이템 스폰
-    if (SpawnDroppedItem(ItemInstance, ActualDropCount))
-    {
-        InventoryManager->TryRemoveItemAt(SlotIndex, ActualDropCount);
+        RemoveFromSlot(Slot, ItemCount);
     }
 }
 
@@ -191,7 +181,6 @@ bool USFItemManagerComponent::TryPickupItem(ASFPickupableItemBase* PickupableIte
         return false;
     }
 
-    // ISFPickupable 인터페이스 확인
     ISFPickupable* Pickupable = Cast<ISFPickupable>(PickupableItem);
     if (!Pickupable)
     {
@@ -211,7 +200,6 @@ bool USFItemManagerComponent::TryPickupItem(ASFPickupableItemBase* PickupableIte
     int32 ItemCount = 0;
     USFItemInstance* ExistingInstance = nullptr;
 
-    // Instance 우선, 없으면 Definition 사용
     if (PickupInfo.PickupInstance.ItemInstance)
     {
         ExistingInstance = PickupInfo.PickupInstance.ItemInstance;
@@ -232,35 +220,158 @@ bool USFItemManagerComponent::TryPickupItem(ASFPickupableItemBase* PickupableIte
         return false;
     }
 
-    // 인벤토리에 추가 가능한지 확인
     TArray<int32> SlotIndices;
     TArray<int32> Counts;
 
     int32 AddableCount = InventoryManager->CanAddItem(ItemID, RarityTag, ItemCount, SlotIndices, Counts);
 
-    // 전부 추가 가능할 때만 픽업
     if (AddableCount != ItemCount)
     {
         return false;
     }
 
-    // 인스턴스가 없으면 새로 생성
-    if (!ExistingInstance)
-    {
-        const USFItemDefinition* ItemDef = USFItemData::Get().FindDefinitionById(ItemID);
-        ExistingInstance = USFItemData::Get().CreateItemInstance(PickupableItem, ItemDef, RarityTag);
-    }
+    const USFItemData& ItemData = USFItemData::Get();
+    const USFItemDefinition* ItemDef = ItemData.FindDefinitionById(ItemID);
 
-    // 인벤토리에 추가
     for (int32 i = 0; i < SlotIndices.Num(); ++i)
     {
-        InventoryManager->AddItemInternal(SlotIndices[i], ExistingInstance, Counts[i]);
+        const int32 SlotIndex = SlotIndices[i];
+        const int32 Count = Counts[i];
+
+        if (InventoryManager->IsSlotEmpty(SlotIndex))
+        {
+            USFItemInstance* InstanceToAdd = nullptr;
+
+            if (ExistingInstance)
+            {
+                InstanceToAdd = ExistingInstance;
+                ExistingInstance = nullptr;
+            }
+            else
+            {
+                InstanceToAdd = ItemData.CreateItemInstance(GetOwner(), ItemDef, RarityTag);
+            }
+
+            InventoryManager->AddItemInternal(SlotIndex, InstanceToAdd, Count);
+        }
+        else
+        {
+            InventoryManager->AddItemInternal(SlotIndex, nullptr, Count);
+        }
     }
 
-    // 픽업 액터 제거
     PickupableItem->Destroy();
-
     return true;
+}
+
+bool USFItemManagerComponent::IsValidSlot(const FSFItemSlotHandle& Slot) const
+{
+    if (!Slot.IsValid())
+    {
+        return false;
+    }
+
+    switch (Slot.SlotType)
+    {
+    case ESFItemSlotType::Inventory:
+        if (USFInventoryManagerComponent* Inv = GetInventoryManager())
+        {
+            return Inv->IsValidSlotIndex(Slot.SlotIndex);
+        }
+        break;
+    case ESFItemSlotType::Quickbar:
+        if (USFQuickbarComponent* QB = GetQuickbarComponent())
+        {
+            return QB->IsValidSlotIndex(Slot.SlotIndex);
+        }
+        break;
+    }
+    return false;
+}
+
+bool USFItemManagerComponent::IsSlotEmpty(const FSFItemSlotHandle& Slot) const
+{
+    switch (Slot.SlotType)
+    {
+    case ESFItemSlotType::Inventory:
+        if (USFInventoryManagerComponent* Inv = GetInventoryManager())
+        {
+            return Inv->IsSlotEmpty(Slot.SlotIndex);
+        }
+        break;
+    case ESFItemSlotType::Quickbar:
+        if (USFQuickbarComponent* QB = GetQuickbarComponent())
+        {
+            return QB->IsSlotEmpty(Slot.SlotIndex);
+        }
+        break;
+    }
+    return true;
+}
+
+bool USFItemManagerComponent::GetSlotInfo(const FSFItemSlotHandle& Slot, USFItemInstance*& OutInstance, int32& OutCount) const
+{
+    OutInstance = nullptr;
+    OutCount = 0;
+
+    switch (Slot.SlotType)
+    {
+    case ESFItemSlotType::Inventory:
+        if (USFInventoryManagerComponent* Inv = GetInventoryManager())
+        {
+            OutInstance = Inv->GetItemInstance(Slot.SlotIndex);
+            OutCount = Inv->GetItemCount(Slot.SlotIndex);
+            return OutInstance != nullptr;
+        }
+        break;
+    case ESFItemSlotType::Quickbar:
+        if (USFQuickbarComponent* QB = GetQuickbarComponent())
+        {
+            OutInstance = QB->GetItemInstance(Slot.SlotIndex);
+            OutCount = QB->GetItemCount(Slot.SlotIndex);
+            return OutInstance != nullptr;
+        }
+        break;
+    }
+    return false;
+}
+
+void USFItemManagerComponent::RemoveFromSlot(const FSFItemSlotHandle& Slot, int32 Count)
+{
+    switch (Slot.SlotType)
+    {
+    case ESFItemSlotType::Inventory:
+        if (USFInventoryManagerComponent* Inv = GetInventoryManager())
+        {
+            Inv->RemoveItemInternal(Slot.SlotIndex, Count);
+        }
+        break;
+    case ESFItemSlotType::Quickbar:
+        if (USFQuickbarComponent* QB = GetQuickbarComponent())
+        {
+            QB->RemoveItemInternal(Slot.SlotIndex, Count);
+        }
+        break;
+    }
+}
+
+void USFItemManagerComponent::AddToSlot(const FSFItemSlotHandle& Slot, USFItemInstance* Instance, int32 Count)
+{
+    switch (Slot.SlotType)
+    {
+    case ESFItemSlotType::Inventory:
+        if (USFInventoryManagerComponent* Inv = GetInventoryManager())
+        {
+            Inv->AddItemInternal(Slot.SlotIndex, Instance, Count);
+        }
+        break;
+    case ESFItemSlotType::Quickbar:
+        if (USFQuickbarComponent* QB = GetQuickbarComponent())
+        {
+            QB->AddItemInternal(Slot.SlotIndex, Instance, Count);
+        }
+        break;
+    }
 }
 
 USFInventoryManagerComponent* USFItemManagerComponent::GetInventoryManager() const
@@ -269,7 +380,15 @@ USFInventoryManagerComponent* USFItemManagerComponent::GetInventoryManager() con
     {
         return Controller->FindComponentByClass<USFInventoryManagerComponent>();
     }
+    return nullptr;
+}
 
+USFQuickbarComponent* USFItemManagerComponent::GetQuickbarComponent() const
+{
+    if (AController* Controller = Cast<AController>(GetOwner()))
+    {
+        return Controller->FindComponentByClass<USFQuickbarComponent>();
+    }
     return nullptr;
 }
 
@@ -291,17 +410,17 @@ UAbilitySystemComponent* USFItemManagerComponent::GetAbilitySystemComponent() co
 
 bool USFItemManagerComponent::SpawnDroppedItem(USFItemInstance* ItemInstance, int32 ItemCount)
 {
-     if (!ItemInstance || ItemCount <= 0)
+    if (!ItemInstance || ItemCount <= 0)
     {
         return false;
     }
 
     const USFItemData& ItemData = USFItemData::Get();
     TSubclassOf<ASFPickupableItemBase> PickupClass = ItemData.PickupableItemClass;
-    
+
     if (!PickupClass)
     {
-        PickupClass = ASFPickupableItemBase::StaticClass();  // 폴백
+        PickupClass = ASFPickupableItemBase::StaticClass();
     }
 
     if (!PickupClass)
@@ -333,7 +452,7 @@ bool USFItemManagerComponent::SpawnDroppedItem(USFItemInstance* ItemInstance, in
         FVector TraceStart = Character->GetCapsuleComponent()->GetComponentLocation();
         FVector TraceEnd = TraceStart + FVector(RandPoint.X, RandPoint.Y, 0.f);
 
-        bool bHit = UKismetSystemLibrary::CapsuleTraceSingle(GetWorld(), TraceStart, TraceEnd, HalfRadius, QuarterHeight, UEngineTypes::ConvertToTraceType(ECC_Visibility), false, ActorsToIgnore, EDrawDebugTrace::None,HitResult, true);
+        bool bHit = UKismetSystemLibrary::CapsuleTraceSingle(GetWorld(), TraceStart, TraceEnd, HalfRadius, QuarterHeight, UEngineTypes::ConvertToTraceType(ECC_Visibility), false, ActorsToIgnore, EDrawDebugTrace::None, HitResult, true);
 
         if (bHit)
         {
@@ -344,11 +463,10 @@ bool USFItemManagerComponent::SpawnDroppedItem(USFItemInstance* ItemInstance, in
 
         if (DroppedItem)
         {
-            // 기존 FSFPickupInfo 구조 사용
             FSFPickupInfo PickupInfo;
             PickupInfo.PickupInstance.ItemInstance = ItemInstance;
             PickupInfo.PickupInstance.ItemCount = ItemCount;
-            
+
             DroppedItem->SetPickupInfo(PickupInfo);
             return true;
         }
@@ -357,25 +475,17 @@ bool USFItemManagerComponent::SpawnDroppedItem(USFItemInstance* ItemInstance, in
     return false;
 }
 
-FGameplayTag USFItemManagerComponent::GetAbilityTriggerTag(const USFItemFragment_Consumable* ConsumeFrag) const
+FGameplayTag USFItemManagerComponent::GetConsumeAbilityTriggerTag(const USFItemFragment_Consumable* ConsumeFrag) const
 {
     if (!ConsumeFrag || !ConsumeFrag->ConsumeTypeTag.IsValid())
     {
         return FGameplayTag();
     }
 
-    // ConsumeTypeTag → AbilityTriggerTag 매핑
     if (ConsumeFrag->ConsumeTypeTag.MatchesTag(SFGameplayTags::Item_Consumable_Potion))
     {
         return SFGameplayTags::Ability_Hero_Drink;
     }
 
-    // 필요시 다른 타입 추가
-    // if (ConsumeFrag->ConsumeTypeTag.MatchesTag(SFGameplayTags::Consumable_Food))
-    // {
-    //     return SFGameplayTags::Ability_Hero_Eat;
-    // }
-
     return FGameplayTag();
 }
-
