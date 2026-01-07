@@ -201,6 +201,14 @@ void USFQuickbarComponent::AddItemInternal(int32 SlotIndex, USFItemInstance* Ite
     }
 
     QuickbarList.MarkItemDirty(Entry);
+
+    if (APlayerController* PC = Cast<APlayerController>(GetOwner()))
+    {
+        if (PC->IsLocalController())
+        {
+            QuickbarList.BroadcastChangedMessage(SlotIndex);
+        }
+    }
 }
 
 USFItemInstance* USFQuickbarComponent::RemoveItemInternal(int32 SlotIndex, int32 ItemCount)
@@ -226,6 +234,15 @@ USFItemInstance* USFQuickbarComponent::RemoveItemInternal(int32 SlotIndex, int32
     }
 
     QuickbarList.MarkItemDirty(Entry);
+
+    if (APlayerController* PC = Cast<APlayerController>(GetOwner()))
+    {
+        if (PC->IsLocalController())
+        {
+            QuickbarList.BroadcastChangedMessage(SlotIndex);
+        }
+    }
+    
     return ItemInstance;
 }
 

@@ -5,6 +5,7 @@
 #include "System/Data/SFStageInfo.h"
 #include "SFPlayerController.generated.h"
 
+class USFQuickbarComponent;
 class USFItemManagerComponent;
 class USFInventoryManagerComponent;
 class USFSharedUIComponent;
@@ -117,6 +118,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SF|Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USFInventoryManagerComponent> InventoryManagerComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SF|Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USFQuickbarComponent> QuickbarComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SF|Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USFItemManagerComponent> ItemManagerComponent;

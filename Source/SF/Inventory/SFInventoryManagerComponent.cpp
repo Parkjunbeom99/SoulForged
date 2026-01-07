@@ -395,6 +395,14 @@ void USFInventoryManagerComponent::AddItemInternal(int32 SlotIndex, USFItemInsta
     }
 
     InventoryList.MarkItemDirty(Entry);
+
+    if (APlayerController* PC = Cast<APlayerController>(GetOwner()))
+    {
+        if (PC->IsLocalController())
+        {
+            InventoryList.BroadcastChangedMessage(SlotIndex);
+        }
+    }
 }
 
 USFItemInstance* USFInventoryManagerComponent::RemoveItemInternal(int32 SlotIndex, int32 ItemCount)
@@ -420,6 +428,15 @@ USFItemInstance* USFInventoryManagerComponent::RemoveItemInternal(int32 SlotInde
     }
 
     InventoryList.MarkItemDirty(Entry);
+
+    if (APlayerController* PC = Cast<APlayerController>(GetOwner()))
+    {
+        if (PC->IsLocalController())
+        {
+            InventoryList.BroadcastChangedMessage(SlotIndex);
+        }
+    }
+    
     return ItemInstance;
 }
 

@@ -75,20 +75,26 @@ void USFItemManagerComponent::Server_MoveItem_Implementation(FSFItemSlotHandle F
     {
         // 같은 아이템: 병합 시도
         const USFItemDefinition* ItemDef = USFItemData::Get().FindDefinitionById(FromInstance->GetItemID());
-        if (ItemDef)
+        if (ItemDef && ItemDef->MaxStackCount > 1)
         {
             int32 Space = ItemDef->MaxStackCount - ToCount;
             if (Space > 0)
             {
+                // 병합 가능
                 int32 ToMerge = FMath::Min(Space, FromCount);
                 RemoveFromSlot(FromSlot, ToMerge);
                 AddToSlot(ToSlot, nullptr, ToMerge);
+                return;
             }
+            // Space <= 0: 병합 불가능 → 스왑으로 진행 (아래로 fall-through)
         }
-        return;
+        else
+        {
+            // MaxStackCount == 1: 스왑으로 진행
+        }
     }
 
-    // ========== 다른 아이템: 스왑 ==========
+    // ========== 스왑 (다른 아이템 또는 병합 불가능한 같은 아이템) ==========
 
     RemoveFromSlot(FromSlot, FromCount);
     RemoveFromSlot(ToSlot, ToCount);

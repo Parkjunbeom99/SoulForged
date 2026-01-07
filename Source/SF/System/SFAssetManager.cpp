@@ -12,6 +12,7 @@ void USFAssetManager::StartInitialLoading()
 
 	GetGameData();
     GetItemData();
+    GetUIData();
 }
 
 void USFAssetManager::FinishInitialLoading()
@@ -33,6 +34,7 @@ void USFAssetManager::PreBeginPIE(bool bStartSimulate)
 
 	GetGameData();
     GetItemData();
+    GetUIData();
 	if (!AreLobbyAssetsLoaded())
 	{
 		LoadAllPrimaryAssets();
@@ -60,6 +62,11 @@ const USFGameData& USFAssetManager::GetGameData()
 const USFItemData& USFAssetManager::GetItemData()
 {
     return GetOrLoadTypedGameData<USFItemData>(ItemDataPath);
+}
+
+const USFUIData& USFAssetManager::GetUIData()
+{
+    return GetOrLoadTypedGameData<USFUIData>(UIDataPath);
 }
 
 TArray<FPrimaryAssetType> USFAssetManager::GetManagedPrimaryAssetTypes() const
