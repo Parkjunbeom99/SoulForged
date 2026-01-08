@@ -44,6 +44,8 @@ public:
 	void TurnCollisionOn();
 	void TurnCollisionOff();
 
+	AActor* GetLastAttacker() const { return LastAttacker; }
+
 protected:
 
 	virtual void OnAbilitySystemInitialized() override;
