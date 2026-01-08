@@ -329,12 +329,6 @@ void USFGA_Dragon_Bite::DetachTarget(AActor* Target)
        Capsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
        Char->GetCharacterMovement()->SetMovementMode(MOVE_Falling);
     }
-    
-    if (APlayerController* PC = Cast<APlayerController>(Target->GetInstigatorController()))
-    {
-       PC->SetIgnoreMoveInput(false);
-       PC->SetIgnoreLookInput(false);
-    }
 
     GetAbilitySystemComponentFromActorInfo()->RemoveGameplayCue(SFGameplayTags::GameplayCue_Dragon_Bite_Loop);
 }

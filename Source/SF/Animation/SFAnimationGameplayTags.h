@@ -20,4 +20,6 @@ namespace SFGameplayTags
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Montage_State_Downed);
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Montage_State_Death);
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Montage_State_Grabbed);
+	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Montage_State_HitReact);
+
 }
