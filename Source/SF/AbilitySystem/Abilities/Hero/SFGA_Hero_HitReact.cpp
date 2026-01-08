@@ -21,6 +21,7 @@ USFGA_Hero_HitReact::USFGA_Hero_HitReact(const FObjectInitializer& ObjectInitial
 
 	AbilityTags.AddTag(SFGameplayTags::Ability_Hero_HitReact);
 	ActivationOwnedTags.AddTag(SFGameplayTags::Character_State_Hit);
+	ActivationBlockedTags.AddTag(SFGameplayTags::Character_State_SuperArmor);
 
 	HitReactMontageTag = SFGameplayTags::Montage_State_HitReact;
 
