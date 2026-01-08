@@ -104,7 +104,7 @@ void USFGA_CharacterDeath::ExecuteDrop(ASFEnemy* Enemy)
 		return;
 	}
 
-	float LuckValue = GetKillerLuckValue(Enemy->GetLastAttacker());
+	float LuckValue = 0.f;
 	FVector DropLocation = Enemy->GetActorLocation();
 
 	// 기본 드롭 테이블
