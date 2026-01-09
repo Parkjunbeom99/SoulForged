@@ -58,23 +58,68 @@ void USFLockOnComponent::UpdateLogic_TargetValidation(float DeltaTime)
 	// A. 기본 유효성 및 거리 검사
 	float Distance = FVector::Dist(GetOwner()->GetActorLocation(), CurrentTarget->GetActorLocation());
 	
-	// IsTargetValidBasic -> IsTargetValid (Interface 사용) 변경
-	if (!IsTargetValid(CurrentTarget) || Distance > LockOnBreakDistance)
+	// 1. 타겟 유효성 검사
+	if (!IsTargetValid(CurrentTarget))
 	{
+		// 자동 스위칭 로직 (Auto-Switch on Death)
+		AActor* NextTarget = FindBestTarget();
+
+		if (NextTarget)
+		{
+			// 새로운 타겟으로 스위칭
+			CurrentTarget = NextTarget;
+			
+			// 소켓 정보 갱신
+			if (const ISFLockOnInterface* LockOnInterface = Cast<const ISFLockOnInterface>(CurrentTarget))
+			{
+				TArray<FName> Sockets = LockOnInterface->GetLockOnSockets();
+				CurrentTargetSocketName = (Sockets.Num() > 0) ? Sockets[0] : LockOnSocketName;
+			}
+			else
+			{
+				CurrentTargetSocketName = LockOnSocketName;
+			}
+
+			// 스위칭 상태로 전환 (카메라 부드럽게 이동)
+			bIsSwitchingTarget = true;
+			CurrentSwitchCooldown = SwitchCooldown;
+			TimeSinceTargetHidden = 0.0f;
+
+			// 위젯 깜빡임 방지를 위해 위치 갱신 또는 재생성
+			DestroyLockOnWidget();
+			CreateLockOnWidget();
+
+			// 락온 유지 (Break 하지 않음)
+			return; 
+		}
+		else
+		{
+			// 주변에 다른 적이 없다면 락온 해제
+			bShouldBreak = true;
+		}
+	}
+	else if (Distance > LockOnBreakDistance)
+	{
+		// 거리가 너무 멀어지면 해제
 		bShouldBreak = true;
 	}
 	else
 	{
 		// 2. 고각(High Angle) 자동 해제 체크
-		// 타겟이 머리 위로 지나가면(드래곤 비행 등) 락온 해제
 		FVector DirectionToTarget = (CurrentTarget->GetActorLocation() - OwnerPawn->GetActorLocation()).GetSafeNormal();
 		FRotator LookAtRot = DirectionToTarget.Rotation();
 		
-		// 상대적인 Pitch 계산
-		// 타겟이 내 머리 바로 위에 있다면 LookAtRot.Pitch는 90에 가까움
-		if (LookAtRot.Pitch > AutoBreakPitchAngle)
+		if (APlayerController* PC = Cast<APlayerController>(OwnerPawn->GetController()))
 		{
-			bShouldBreak = true;
+			float ViewPitch = PC->GetControlRotation().Pitch;
+			// 회전값 정규화 (-180 ~ 180)
+			if (ViewPitch > 180.0f) ViewPitch -= 360.0f;
+			
+			// 올려다보는 각도가 한계치를 넘으면 해제
+			if (ViewPitch > AutoBreakPitchAngle) 
+			{
+				bShouldBreak = true;
+			}
 		}
 
 		// 3. 시야 가림 유예 (Grace Period)
@@ -87,11 +132,11 @@ void USFLockOnComponent::UpdateLogic_TargetValidation(float DeltaTime)
 
 			FVector Start = OwnerPawn->GetActorLocation() + FVector(0, 0, 50);
 			FVector End = GetActorSocketLocation(CurrentTarget, CurrentTargetSocketName);
-			
+
 			bool bHit = GetWorld()->LineTraceSingleByChannel(
 				HitResult, Start, End, ECC_Visibility, QueryParams
 			);
-			
+
 			if (bHit)
 			{
 				TimeSinceTargetHidden += DeltaTime;
@@ -569,6 +614,12 @@ AActor* USFLockOnComponent::FindBestTarget()
 void USFLockOnComponent::CreateLockOnWidget()
 {
 	if (!LockOnWidgetClass || !GetWorld()) return;
+
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (OwnerPawn && !OwnerPawn->IsLocallyControlled())
+	{
+		return;
+	}
 
 	if (!LockOnWidgetInstance)
 	{

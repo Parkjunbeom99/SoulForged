@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Character/SFCharacterBase.h"
 #include "Abilities/GameplayAbilityTypes.h"
+#include "Interface/SFLockOnInterface.h"
 #include "GameplayEffectTypes.h" // FOnAttributeChangeData 사용에 필요
 #include "SFEnemy.generated.h"
 
@@ -16,7 +17,7 @@ class USFPrimarySet;
 class UUserWidget;
 
 UCLASS(Blueprintable)
-class SF_API ASFEnemy : public ASFCharacterBase
+class SF_API ASFEnemy : public ASFCharacterBase, public ISFLockOnInterface
 {
 	GENERATED_BODY()
 
@@ -45,6 +46,11 @@ public:
 
 	void TurnCollisionOn();
 	void TurnCollisionOff();
+
+	// ISFLockOnInterface Implementation
+	virtual bool CanBeLockedOn() const override;
+	virtual TArray<FName> GetLockOnSockets() const override;
+	virtual void OnSelectedAsTarget(bool bSelected) override;
 
 	FName GetName() const;
 
@@ -88,4 +94,8 @@ protected:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy|InitializeEffect")
 	TSubclassOf<UGameplayEffect> InitializeEffect;
+	
+	// 기본 락온 소켓 이름 (spine_02 등)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SF|LockOn")
+	FName DefaultLockOnSocketName = FName("spine_02");
 };
