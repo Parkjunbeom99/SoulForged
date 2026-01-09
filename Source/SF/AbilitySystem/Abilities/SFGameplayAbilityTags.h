@@ -63,6 +63,8 @@ namespace SFGameplayTags
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Hero_Death);
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Hero_Grabbed);
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Hero_HitReact);
+
+	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Sprint);
 	
 	// Hero Skill Cooldowns
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Cooldown_Hero_Skill_Primary);
