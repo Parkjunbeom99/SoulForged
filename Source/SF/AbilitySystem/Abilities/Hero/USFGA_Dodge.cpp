@@ -13,6 +13,8 @@
 USFGA_Dodge::USFGA_Dodge(FObjectInitializer const& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
+	// 예측 정책 설정
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 	SetAssetTags(FGameplayTagContainer(SFGameplayTags::Ability_Hero_Dodge));
 }
 
@@ -26,72 +28,93 @@ void USFGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	}
 
 	// 1. 공중 사용 불가 체크
-	if (Character->GetCharacterMovement()->IsFalling())
+	UCharacterMovementComponent* CMC = Character->GetCharacterMovement();
+	if (CMC->IsFalling())
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	// 2. 락온 상태 확인 (GAS 태그)
+	// 구르기 중에는 CMC가 멋대로 캐릭터를 회전시키지 못하게 막습니다.
+	// 기존 설정 백업
+	bSavedOrientRotationToMovement = CMC->bOrientRotationToMovement;
+	bSavedUseControllerRotationYaw = Character->bUseControllerRotationYaw;
+
+	// 회전 제어 비활성화 (루트모션과 모션워핑이 전적으로 제어하도록)
+	CMC->bOrientRotationToMovement = false;
+	Character->bUseControllerRotationYaw = false;
+
+	// 2. 락온 상태 확인
 	bool bIsLockedOn = Character->HasMatchingGameplayTag(SFGameplayTags::Character_State_LockedOn);
 
+	// 3. 클라이언트(혹은 Standalone) 처리
 	if (IsLocallyControlled())
 	{
-		// [Client/Standalone] 예측 실행
 		FVector TargetLoc;
 		FRotator TargetRot;
-		UAnimMontage* MontageToPlay = nullptr;
+		ESFDodgeDirection DodgeDir;
 
-		// 파라미터 및 몽타주 계산
-		CalculateDodgeParameters(bIsLockedOn, TargetLoc, TargetRot, MontageToPlay);
+		CalculateDodgeParameters(bIsLockedOn, TargetLoc, TargetRot, DodgeDir);
+		ApplyDodge(TargetLoc, TargetRot, DodgeDir);
 
-		// 실행
-		ApplyDodge(TargetLoc, TargetRot, MontageToPlay);
-
-		// 서버로 타겟 데이터 전송
 		USFAbilitySystemComponent* ASC = Cast<USFAbilitySystemComponent>(GetAbilitySystemComponentFromActorInfo());
 		if (ASC && !Character->HasAuthority())
 		{
 			FGameplayAbilityTargetData_LocationInfo* NewData = new FGameplayAbilityTargetData_LocationInfo();
 			NewData->TargetLocation.LocationType = EGameplayAbilityTargetingLocationType::LiteralTransform;
-			NewData->TargetLocation.LiteralTransform = FTransform(TargetRot, TargetLoc);
+			
+			FVector PackedParams((float)DodgeDir, 1.0f, 1.0f); 
+			NewData->TargetLocation.LiteralTransform = FTransform(TargetRot, TargetLoc, PackedParams);
 
 			FGameplayAbilityTargetDataHandle HandleData(NewData);
-			ASC->ServerSetReplicatedTargetData(CurrentSpecHandle, CurrentActivationInfo.GetActivationPredictionKey(), HandleData, FGameplayTag(), ASC->ScopedPredictionKey);
+			
+			ASC->ServerSetReplicatedTargetData(
+				CurrentSpecHandle, 
+				CurrentActivationInfo.GetActivationPredictionKey(), 
+				HandleData, 
+				FGameplayTag(), 
+				ASC->ScopedPredictionKey
+			);
 		}
 	}
+	// 4. 서버 처리
 	else
 	{
-		// [Server] 클라이언트 데이터 대기
 		USFAbilitySystemComponent* ASC = Cast<USFAbilitySystemComponent>(GetAbilitySystemComponentFromActorInfo());
 		if (ASC)
 		{
-			FAbilityTargetDataSetDelegate& TargetDataDelegate = ASC->AbilityTargetDataSetDelegate(CurrentSpecHandle, CurrentActivationInfo.GetActivationPredictionKey());
+			const FPredictionKey ActivationPredictionKey = CurrentActivationInfo.GetActivationPredictionKey();
+
+			FAbilityTargetDataSetDelegate& TargetDataDelegate = ASC->AbilityTargetDataSetDelegate(
+				CurrentSpecHandle, 
+				ActivationPredictionKey
+			);
+			
 			ServerTargetDataDelegateHandle = TargetDataDelegate.AddUObject(this, &USFGA_Dodge::OnServerTargetDataReceived);
+			ASC->CallReplicatedTargetDataDelegatesIfSet(CurrentSpecHandle, ActivationPredictionKey);
 		}
 	}
 }
 
-void USFGA_Dodge::CalculateDodgeParameters(bool bIsLockedOn, FVector& OutLocation, FRotator& OutRotation, UAnimMontage*& OutMontage) const
+void USFGA_Dodge::CalculateDodgeParameters(bool bIsLockedOn, FVector& OutLocation, FRotator& OutRotation, ESFDodgeDirection& OutDirection) const
 {
 	ASFCharacterBase* Character = GetSFCharacterFromActorInfo();
 	if (!Character) return;
 
 	// 1. 입력 방향 가져오기
-	FVector InputDir = Character->GetLastInputDirection(); // 월드 기준 입력 벡터
+	FVector InputDir = Character->GetLastInputDirection(); 
 	bool bHasInput = !InputDir.IsNearlyZero();
 
 	// 2. 입력이 없으면 백스텝
 	if (!bHasInput)
 	{
-		// 백스텝은 현재 방향 유지 + 뒤로 이동
 		OutRotation = Character->GetActorRotation();
-		OutLocation = Character->GetActorLocation() - (Character->GetActorForwardVector() * DodgeDistance * 0.5f); // 백스텝은 거리를 좀 짧게
-		OutMontage = BackstepMontage;
+		OutLocation = Character->GetActorLocation() - (Character->GetActorForwardVector() * DodgeDistance * 0.5f);
+		OutDirection = ESFDodgeDirection::Backstep;
 		return;
 	}
 
-	// 3. 입력이 있을 때 (락온 여부에 따른 분기)
+	// 3. 입력이 있을 때
 	FRotator ControlRot = Character->GetControlRotation();
 	ControlRot.Pitch = 0.0f;
 	ControlRot.Roll = 0.0f;
@@ -99,57 +122,54 @@ void USFGA_Dodge::CalculateDodgeParameters(bool bIsLockedOn, FVector& OutLocatio
 	if (bIsLockedOn)
 	{
 		// [Locked On] 
-		// 회전: 타겟(카메라) 방향 고정
-		OutRotation = ControlRot;
-
-		// 몽타주: 입력 방향에 따라 4방향 선택 (전/후/좌/우)
-		OutMontage = SelectMontageBasedOnInput(InputDir, ControlRot);
-
-		// 위치: 입력 방향으로 이동
+		OutRotation = ControlRot; 
 		OutLocation = Character->GetActorLocation() + (InputDir.GetSafeNormal() * DodgeDistance);
+
+		FVector LocalDir = ControlRot.UnrotateVector(InputDir);
+		
+		// 락온 상태에서도 부드럽게 나가도록 Threshold 조정 가능
+		if (FMath::Abs(LocalDir.X) > FMath::Abs(LocalDir.Y))
+		{
+			OutDirection = (LocalDir.X > 0) ? ESFDodgeDirection::Forward : ESFDodgeDirection::Backward;
+		}
+		else
+		{
+			OutDirection = (LocalDir.Y > 0) ? ESFDodgeDirection::Right : ESFDodgeDirection::Left;
+		}
 	}
 	else
 	{
 		// [Free Camera]
-		// 회전: 입력 방향을 바라봄
-		OutRotation = InputDir.Rotation();
+		OutRotation = InputDir.Rotation(); // 입력 방향을 봄
 		OutRotation.Pitch = 0.0f;
-
-		// 몽타주: 무조건 앞구르기
-		OutMontage = DirectionalDodgeMontages.ForwardMontage;
-
-		// 위치: 입력 방향으로 이동
 		OutLocation = Character->GetActorLocation() + (InputDir.GetSafeNormal() * DodgeDistance);
+		
+		// 프리 카메라 모드에서는 항상 앞구르기 모션 사용
+		OutDirection = ESFDodgeDirection::Forward;
 	}
 }
 
-UAnimMontage* USFGA_Dodge::SelectMontageBasedOnInput(const FVector& InputDirection, const FRotator& ControlRotation) const
+UAnimMontage* USFGA_Dodge::GetMontageFromDirection(ESFDodgeDirection Direction) const
 {
-	// 입력 벡터를 컨트롤러(카메라) 기준 로컬 공간으로 변환
-	FVector LocalDir = ControlRotation.UnrotateVector(InputDirection);
-	
-	// 각도에 따른 4방향 판정
-	// X+: Forward, X-: Backward, Y+: Right, Y-: Left
-	
-	float AbsX = FMath::Abs(LocalDir.X);
-	float AbsY = FMath::Abs(LocalDir.Y);
-
-	if (AbsX > AbsY) // 앞/뒤 움직임이 더 큼
+	switch (Direction)
 	{
-		return (LocalDir.X > 0) ? DirectionalDodgeMontages.ForwardMontage : DirectionalDodgeMontages.BackwardMontage;
-	}
-	else // 좌/우 움직임이 더 큼
-	{
-		return (LocalDir.Y > 0) ? DirectionalDodgeMontages.RightMontage : DirectionalDodgeMontages.LeftMontage;
+	case ESFDodgeDirection::Forward:  return DirectionalDodgeMontages.ForwardMontage;
+	case ESFDodgeDirection::Backward: return DirectionalDodgeMontages.BackwardMontage;
+	case ESFDodgeDirection::Left:     return DirectionalDodgeMontages.LeftMontage;
+	case ESFDodgeDirection::Right:    return DirectionalDodgeMontages.RightMontage;
+	case ESFDodgeDirection::Backstep: return BackstepMontage;
+	default: return DirectionalDodgeMontages.ForwardMontage;
 	}
 }
 
-void USFGA_Dodge::ApplyDodge(const FVector& TargetLocation, const FRotator& TargetRotation, UAnimMontage* MontageToPlay)
+void USFGA_Dodge::ApplyDodge(const FVector& TargetLocation, const FRotator& TargetRotation, ESFDodgeDirection Direction)
 {
-	// 1. Motion Warping 설정
+	// 1. Motion Warping 설정 (몽타주 재생 전 필수)
 	SetupMotionWarping(TargetLocation, TargetRotation);
 
 	// 2. 몽타주 재생
+	UAnimMontage* MontageToPlay = GetMontageFromDirection(Direction);
+
 	if (MontageToPlay)
 	{
 		UAbilityTask_PlayMontageAndWait* Task = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
@@ -173,35 +193,40 @@ void USFGA_Dodge::ApplyDodge(const FVector& TargetLocation, const FRotator& Targ
 	}
 	else
 	{
-		// 몽타주가 없으면 즉시 종료 (안전장치)
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 	}
 }
 
 void USFGA_Dodge::OnServerTargetDataReceived(const FGameplayAbilityTargetDataHandle& DataHandle, FGameplayTag ActivationTag)
 {
-	// 서버에서 클라이언트의 예측 데이터를 받아 실행
+	// [Server] 클라이언트가 보낸 데이터를 신뢰하여 실행
+	
 	const FGameplayAbilityTargetData_LocationInfo* LocationData = static_cast<const FGameplayAbilityTargetData_LocationInfo*>(DataHandle.Get(0));
 	if (LocationData)
 	{
-		FTransform TargetTransform = LocationData->TargetLocation.LiteralTransform;
+		// 데이터 언패킹 (Unpacking)
+		FTransform ReceivedTransform = LocationData->TargetLocation.LiteralTransform;
 		
-		// 몽타주 재계산 (서버에서도 동일한 입력/락온 상태라고 가정하거나, 클라에서 몽타주 인덱스를 보내는게 더 확실하지만,
-		// 여기서는 로컬 상태 기준으로 다시 계산. 더 정확히 하려면 TargetData에 몽타주 정보도 포함해야 함)
-		// *개선*: 여기서는 편의상 서버에서도 Calculate를 다시 호출하여 몽타주를 결정합니다.
-		// (동기화 문제가 발생한다면 TargetData를 커스텀하여 몽타주 ID를 보내야 합니다)
+		FVector TargetWarpLoc = ReceivedTransform.GetLocation();
+		FRotator TargetFaceRot = ReceivedTransform.Rotator();
 		
-		ASFCharacterBase* Character = GetSFCharacterFromActorInfo();
-		bool bIsLockedOn = Character && Character->HasMatchingGameplayTag(SFGameplayTags::Character_State_LockedOn);
-		
-		// 위치/회전은 클라에서 받은걸 신뢰, 몽타주는 서버 상태 기준으로 선택
-		FVector DummyLoc; FRotator DummyRot; UAnimMontage* MontageToPlay = nullptr;
-		CalculateDodgeParameters(bIsLockedOn, DummyLoc, DummyRot, MontageToPlay);
+		// Scale.X에 숨겨둔 Enum 값을 복원 (float -> uint8 -> Enum)
+		uint8 EnumIndex = (uint8)ReceivedTransform.GetScale3D().X;
+		ESFDodgeDirection ReceivedDirection = (ESFDodgeDirection)EnumIndex;
 
-		ApplyDodge(TargetTransform.GetLocation(), TargetTransform.Rotator(), MontageToPlay);
+		// GAS 시스템에 "타겟 데이터 사용함" 알림
+		USFAbilitySystemComponent* ASC = Cast<USFAbilitySystemComponent>(GetAbilitySystemComponentFromActorInfo());
+		if (ASC)
+		{
+			ASC->ConsumeClientReplicatedTargetData(CurrentSpecHandle, CurrentActivationInfo.GetActivationPredictionKey());
+		}
+
+		// 서버 실행 (클라이언트와 완벽히 동일한 동작 보장)
+		ApplyDodge(TargetWarpLoc, TargetFaceRot, ReceivedDirection);
 	}
 	else
 	{
+		// 데이터 오류 시 강제 종료
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 	}
 }
@@ -225,28 +250,35 @@ void USFGA_Dodge::OnMontageFinished()
 
 void USFGA_Dodge::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-	// 델리게이트 정리
-	if (ActorInfo->IsNetAuthority() && ServerTargetDataDelegateHandle.IsValid())
+	ASFCharacterBase* Character = GetSFCharacterFromActorInfo();
+	if (Character)
 	{
-		USFAbilitySystemComponent* ASC = GetSFAbilitySystemComponentFromActorInfo();
-		if (ASC)
+		UCharacterMovementComponent* CMC = Character->GetCharacterMovement();
+		if (CMC)
 		{
-			FAbilityTargetDataSetDelegate& TargetDataDelegate = ASC->AbilityTargetDataSetDelegate(
-				CurrentSpecHandle, 
-				CurrentActivationInfo.GetActivationPredictionKey()
-			);
-			TargetDataDelegate.Remove(ServerTargetDataDelegateHandle);
+			CMC->bOrientRotationToMovement = bSavedOrientRotationToMovement;
 		}
-		ServerTargetDataDelegateHandle.Reset();
-	}
+		Character->bUseControllerRotationYaw = bSavedUseControllerRotationYaw;
 
-	// Motion Warping 타겟 정리
-	if (ASFCharacterBase* Character = GetSFCharacterFromActorInfo())
-	{
+		// Motion Warping 타겟 정리
 		if (UMotionWarpingComponent* MW = Character->GetMotionWarpingComponent())
 		{
 			MW->RemoveWarpTarget(WarpTargetName);
 		}
+	}
+	
+	if (ActorInfo->IsNetAuthority() && ServerTargetDataDelegateHandle.IsValid())
+	{
+		USFAbilitySystemComponent* ASC = Cast<USFAbilitySystemComponent>(GetAbilitySystemComponentFromActorInfo());
+		if (ASC)
+		{
+			FAbilityTargetDataSetDelegate& TargetDataDelegate = ASC->AbilityTargetDataSetDelegate(
+				Handle, 
+				ActivationInfo.GetActivationPredictionKey()
+			);
+			TargetDataDelegate.Remove(ServerTargetDataDelegateHandle);
+		}
+		ServerTargetDataDelegateHandle.Reset();
 	}
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

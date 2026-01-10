@@ -5,8 +5,20 @@
 #include "USFGA_Dodge.generated.h"
 
 /**
+ * 도지 방향 정의 (네트워크 동기화용)
+ */
+UENUM(BlueprintType)
+enum class ESFDodgeDirection : uint8
+{
+	Forward = 0,
+	Backward,
+	Left,
+	Right,
+	Backstep
+};
+
+/**
  * 4방향 회피 몽타주 구조체
- * (직업별로 다른 애니메이션을 할당하기 위함)
  */
 USTRUCT(BlueprintType)
 struct FDodgeMontageSet
@@ -27,7 +39,7 @@ struct FDodgeMontageSet
 };
 
 /**
- * 소울류 구르기 (클라이언트 예측 + 서버 동기화 + 4방향 락온 지원)
+ * 소울류 구르기 (클라이언트 예측 + 서버 동기화)
  */
 UCLASS()
 class SF_API USFGA_Dodge : public USFGameplayAbility
@@ -45,28 +57,33 @@ protected:
 	UFUNCTION()
 	void OnMontageFinished();
 
-	// [계산] 구를 방향과 위치, 몽타주를 결정하는 함수
-	// bIsLockedOn: 락온 상태 여부
-	void CalculateDodgeParameters(bool bIsLockedOn, FVector& OutLocation, FRotator& OutRotation, UAnimMontage*& OutMontage) const;
+	// -------------------------------------------------------------------------
+	// Core Logic
+	// -------------------------------------------------------------------------
 
-	// [실행] 계산된 파라미터로 구르기 실행 (MotionWarping + PlayMontage)
-	void ApplyDodge(const FVector& TargetLocation, const FRotator& TargetRotation, UAnimMontage* MontageToPlay);
+	/** * [계산] 현재 입력과 락온 상태를 기반으로 타겟 위치, 회전, 방향을 결정 
+	 * OutDirection: 결정된 구르기 방향 (이걸 서버로 보냄)
+	 */
+	void CalculateDodgeParameters(bool bIsLockedOn, FVector& OutLocation, FRotator& OutRotation, ESFDodgeDirection& OutDirection) const;
 
-	// [서버] 클라이언트 타겟 데이터 수신 핸들러
+	/** [실행] 결정된 데이터로 구르기 실제 수행 */
+	void ApplyDodge(const FVector& TargetLocation, const FRotator& TargetRotation, ESFDodgeDirection Direction);
+
+	/** [서버] 클라이언트 타겟 데이터 수신 핸들러 */
 	void OnServerTargetDataReceived(const FGameplayAbilityTargetDataHandle& DataHandle, FGameplayTag ActivationTag);
 	
-	// Motion Warping 설정 헬퍼
+	/** Motion Warping 설정 헬퍼 */
 	void SetupMotionWarping(const FVector& TargetLocation, const FRotator& TargetRotation);
 
-	// 현재 입력 방향에 따른 몽타주 반환 (Local Space 기준)
-	UAnimMontage* SelectMontageBasedOnInput(const FVector& InputDirection, const FRotator& ControlRotation) const;
+	/** 방향 Enum을 몽타주로 변환하는 헬퍼 */
+	UAnimMontage* GetMontageFromDirection(ESFDodgeDirection Direction) const;
 
 protected:
 	// =========================================================
-	//  Configuration (직업별 설정 가능)
+	//  Configuration
 	// =========================================================
 
-	// [New] 4방향 구르기 몽타주 세트 (기존 단일 DodgeMontage 대체)
+	// 4방향 구르기 몽타주 세트 (기존 단일 DodgeMontage 대체)
 	UPROPERTY(EditDefaultsOnly, Category = "SF|Animation")
 	FDodgeMontageSet DirectionalDodgeMontages;
 
@@ -84,4 +101,7 @@ protected:
 
 private:
 	FDelegateHandle ServerTargetDataDelegateHandle;
+	
+	bool bSavedOrientRotationToMovement;
+	bool bSavedUseControllerRotationYaw;
 };
