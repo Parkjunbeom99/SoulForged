@@ -33,6 +33,19 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Sound")
 	TSoftObjectPtr<USoundAttenuation> Effect_Attenuation;
+
+	// ===== Cosmetic 추가 =====
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Cosmetic")
+	FName AttachSocketName = NAME_None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Cosmetic")
+	FVector LocationOffset = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Cosmetic")
+	FRotator RotationOffset = FRotator::ZeroRotator;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Cosmetic|Niagara")
+	FName NiagaraScaleParam = NAME_None;
 };
 
 UCLASS()

@@ -44,21 +44,12 @@ bool ASFGC_PlayCosmetic_Actor::OnActive_Implementation(AActor* MyTarget, const F
         return false;
     }
     
-    const USFGameplayCueCosmeticData* CosmeticData = Cast<USFGameplayCueCosmeticData>(Parameters.SourceObject);
+    // SourceObject 사용 안 함 - EffectData에서 직접 가져옴
+    const FName SocketName = EffectData->AttachSocketName;
+    const FVector LocOffset = EffectData->LocationOffset;
+    const FRotator RotOffset = EffectData->RotationOffset;
+    const FName ScaleParam = EffectData->NiagaraScaleParam;
     
-    FName SocketName = NAME_None;
-    FVector LocOffset = FVector::ZeroVector;
-    FRotator RotOffset = FRotator::ZeroRotator;
-    FName ScaleParam = NAME_None;
-
-    if (CosmeticData)
-    {
-        SocketName = CosmeticData->AttachSocketName;
-        LocOffset = CosmeticData->LocationOffset;
-        RotOffset = CosmeticData->RotationOffset;
-        ScaleParam = CosmeticData->NiagaraScaleParam;
-    }
-
     USkeletalMeshComponent* Mesh = MyTarget->FindComponentByClass<USkeletalMeshComponent>();
     
     if (!EffectData->Effect_NiagaraSystem.IsNull())
