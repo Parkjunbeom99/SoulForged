@@ -648,7 +648,7 @@ AActor* USFLockOnComponent::FindBestTarget()
 		// [C] 보스 보너스
 		if (const IGameplayTagAssetInterface* TagInterface = Cast<const IGameplayTagAssetInterface>(Candidate))
 		{
-			if (TagInterface->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Character.Type.Boss"))))
+			if (TagInterface->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Character.Type.Boss"), false)))
 			{
 				Score += Weight_BossBonus;
 			}
