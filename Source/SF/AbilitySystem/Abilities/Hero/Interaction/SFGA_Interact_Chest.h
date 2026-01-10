@@ -27,4 +27,9 @@ protected:
 protected:
 	virtual void OnChestOpened(class ASFChestBase* ChestActor);
 
+private:
+	// 상자 상호작용시 기존 움직임 입력을 플러시하기 위해 사용
+	UPROPERTY(EditDefaultsOnly, Category="SF|Interaction")
+	TObjectPtr<UInputAction> MoveInputAction;
+
 };
