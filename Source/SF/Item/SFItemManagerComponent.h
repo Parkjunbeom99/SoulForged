@@ -64,7 +64,9 @@ public:
 
 protected:
 
-	void UseConsumableItem(USFItemInstance* ItemInstance, const class USFItemFragment_Consumable* ConsumeFrag, const FSFItemSlotHandle& Slot);
+	// 자동 장착/해제
+	bool TryAutoEquipToQuickbar(const FSFItemSlotHandle& FromSlot);
+	bool TryUnequipToInventory(const FSFItemSlotHandle& FromSlot);
 
 	bool IsValidSlot(const FSFItemSlotHandle& Slot) const;
 	bool IsSlotEmpty(const FSFItemSlotHandle& Slot) const;

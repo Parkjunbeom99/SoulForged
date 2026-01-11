@@ -122,37 +122,175 @@ void USFItemManagerComponent::Server_UseItem_Implementation(FSFItemSlotHandle Sl
         return;
     }
 
-    // ========== Fragment 타입별 분기 ==========
-
-    if (const USFItemFragment_Consumable* ConsumeFrag = ItemInstance->FindFragmentByClass<USFItemFragment_Consumable>())
+    // ========== 슬롯 타입별 분기 ==========
+    // 인벤토리 → 퀵바 (자동장착)
+    if (Slot.SlotType == ESFItemSlotType::Inventory)
     {
-        UseConsumableItem(ItemInstance, ConsumeFrag, Slot);
+        TryAutoEquipToQuickbar(Slot);
         return;
     }
 
-    // 추후 다른 타입 추가
+    // 퀵바 → 인벤토리 (장착해제)
+    if (Slot.SlotType == ESFItemSlotType::Quickbar)
+    {
+        TryUnequipToInventory(Slot);
+        return;
     }
+}
 
-void USFItemManagerComponent::UseConsumableItem(USFItemInstance* ItemInstance, const class USFItemFragment_Consumable* ConsumeFrag, const FSFItemSlotHandle& Slot)
+bool USFItemManagerComponent::TryAutoEquipToQuickbar(const FSFItemSlotHandle& FromSlot)
 {
-    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-    if (!ASC)
+    USFInventoryManagerComponent* InventoryManager = GetInventoryManager();
+    USFQuickbarComponent* QuickbarComponent = GetQuickbarComponent();
+
+    if (!InventoryManager || !QuickbarComponent)
     {
-        return;
+        return false;
     }
 
-    FGameplayTag TriggerTag = GetConsumeAbilityTriggerTag(ConsumeFrag);
-    if (!TriggerTag.IsValid())
+    USFItemInstance* ItemInstance = nullptr;
+    int32 ItemCount = 0;
+    if (!GetSlotInfo(FromSlot, ItemInstance, ItemCount))
     {
-        return;
+        return false;
     }
 
-    FGameplayEventData EventData;
-    EventData.OptionalObject = ItemInstance;
-    EventData.Instigator = GetOwner();
-    EventData.EventMagnitude = static_cast<float>(Slot.SlotIndex);
+    const int32 ItemID = ItemInstance->GetItemID();
+    const FGameplayTag& RarityTag = ItemInstance->GetItemRarityTag();
 
-    ASC->HandleGameplayEvent(TriggerTag, &EventData);
+    const USFItemDefinition* ItemDef = USFItemData::Get().FindDefinitionById(ItemID);
+    if (!ItemDef)
+    {
+        return false;
+    }
+
+    const int32 MaxStack = ItemDef->MaxStackCount;
+    int32 RemainingCount = ItemCount;
+
+    // 1. 기존 스택에 병합 시도 (MaxStack > 1인 경우)
+    if (MaxStack > 1)
+    {
+        const TArray<FSFQuickbarEntry>& Entries = QuickbarComponent->GetAllEntries();
+        for (int32 i = 0; i < Entries.Num() && RemainingCount > 0; ++i)
+        {
+            const FSFQuickbarEntry& Entry = Entries[i];
+            if (!Entry.GetItemInstance())
+            {
+                continue;
+            }
+
+            // 같은 아이템인지 확인
+            if (Entry.GetItemInstance()->GetItemID() != ItemID)
+            {
+                continue;
+            }
+
+            if (!Entry.GetItemInstance()->GetItemRarityTag().MatchesTagExact(RarityTag))
+            {
+                continue;
+            }
+
+            const int32 Space = MaxStack - Entry.GetItemCount();
+            if (Space > 0)
+            {
+                const int32 ToMove = FMath::Min(Space, RemainingCount);
+
+                // 인벤토리에서 제거
+                RemoveFromSlot(FromSlot, ToMove);
+
+                // 퀵바에 추가 (기존 슬롯에 병합)
+                QuickbarComponent->AddItemInternal(i, nullptr, ToMove);
+
+                RemainingCount -= ToMove;
+            }
+        }
+    }
+
+    // 2. 빈 슬롯에 배치
+    if (RemainingCount > 0)
+    {
+        const TArray<FSFQuickbarEntry>& Entries = QuickbarComponent->GetAllEntries();
+        for (int32 i = 0; i < Entries.Num() && RemainingCount > 0; ++i)
+        {
+            if (!Entries[i].IsEmpty())
+            {
+                continue;
+            }
+
+            const int32 ToMove = FMath::Min(MaxStack, RemainingCount);
+
+            // 인벤토리에서 아이템 가져오기
+            USFItemInstance* MovingInstance = InventoryManager->RemoveItemInternal(FromSlot.SlotIndex, ToMove);
+
+            // 퀵바에 추가
+            QuickbarComponent->AddItemInternal(i, MovingInstance, ToMove);
+
+            RemainingCount -= ToMove;
+        }
+    }
+
+    return RemainingCount < ItemCount;  // 하나라도 이동했으면 true
+}
+
+bool USFItemManagerComponent::TryUnequipToInventory(const FSFItemSlotHandle& FromSlot)
+{
+    USFInventoryManagerComponent* InventoryManager = GetInventoryManager();
+    USFQuickbarComponent* QuickbarComponent = GetQuickbarComponent();
+
+    if (!InventoryManager || !QuickbarComponent)
+    {
+        return false;
+    }
+
+    USFItemInstance* ItemInstance = nullptr;
+    int32 ItemCount = 0;
+    if (!GetSlotInfo(FromSlot, ItemInstance, ItemCount))
+    {
+        return false;
+    }
+
+    const int32 ItemID = ItemInstance->GetItemID();
+    const FGameplayTag& RarityTag = ItemInstance->GetItemRarityTag();
+
+    // 인벤토리에 추가 가능한지 확인
+    TArray<int32> SlotIndices;
+    TArray<int32> Counts;
+    int32 AddableCount = InventoryManager->CanAddItem(ItemID, RarityTag, ItemCount, SlotIndices, Counts);
+
+    if (AddableCount <= 0)
+    {
+        return false;  // 공간 없음
+    }
+
+    // 전부 이동 가능한 경우만 처리 (TODO : 부분 이동 원하면 수정)
+    if (AddableCount < ItemCount)
+    {
+        return false;  // 전부 이동 불가
+    }
+
+    // 퀵바에서 제거
+    USFItemInstance* MovedInstance = QuickbarComponent->RemoveItemInternal(FromSlot.SlotIndex, ItemCount);
+
+    // 인벤토리에 추가
+    for (int32 i = 0; i < SlotIndices.Num(); ++i)
+    {
+        const int32 SlotIndex = SlotIndices[i];
+        const int32 Count = Counts[i];
+
+        if (InventoryManager->IsSlotEmpty(SlotIndex))
+        {
+            // 빈 슬롯에는 인스턴스와 함께 추가
+            InventoryManager->AddItemInternal(SlotIndex, MovedInstance, Count);
+            MovedInstance = nullptr;  // 첫 빈 슬롯에만 인스턴스 전달
+        }
+        else
+        {
+            // 기존 슬롯에는 카운트만 추가
+            InventoryManager->AddItemInternal(SlotIndex, nullptr, Count);
+        }
+    }
+
+    return true;
 }
 
 void USFItemManagerComponent::Server_DropItem_Implementation(FSFItemSlotHandle Slot)
