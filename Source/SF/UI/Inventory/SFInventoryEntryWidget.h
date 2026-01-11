@@ -17,6 +17,8 @@ class SF_API USFInventoryEntryWidget : public USFItemEntryWidget
 public:
 	USFInventoryEntryWidget(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
+	virtual ESFItemSlotType GetSlotType() const override { return ESFItemSlotType::Inventory; }
+
 	void Init(USFInventorySlotWidget* InSlotWidget, USFItemInstance* InItemInstance, int32 InItemCount);
 
 protected:

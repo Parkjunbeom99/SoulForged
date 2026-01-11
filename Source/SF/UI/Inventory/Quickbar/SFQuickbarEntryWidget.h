@@ -17,6 +17,8 @@ class SF_API USFQuickbarEntryWidget : public USFItemEntryWidget
 public:
 	USFQuickbarEntryWidget(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
+	virtual ESFItemSlotType GetSlotType() const override { return ESFItemSlotType::Quickbar; }
+
 	void Init(USFQuickbarSlotWidget* InSlotWidget, USFItemInstance* InItemInstance, int32 InItemCount);
 
 protected:

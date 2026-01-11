@@ -153,7 +153,7 @@ void USFItemEntryWidget::ShowItemHoverWidget(const FPointerEvent& InMouseEvent)
 
 	if (ItemHoverWidget)
 	{
-		ItemHoverWidget->RefreshUI(ItemInstance);
+		ItemHoverWidget->RefreshUI(ItemInstance, GetSlotType());
 		ItemHoverWidget->AddToViewport(100);
 		ItemHoverWidget->SetPosition(InMouseEvent.GetScreenSpacePosition());
 	}

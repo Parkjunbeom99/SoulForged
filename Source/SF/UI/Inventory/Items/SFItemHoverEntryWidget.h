@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Item/SFItemManagerComponent.h"
+
 #include "SFItemHoverEntryWidget.generated.h"
 
 class UVerticalBox;
@@ -21,7 +23,7 @@ public:
 	USFItemHoverEntryWidget(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 public:
-	void RefreshUI(const USFItemInstance* ItemInstance);
+	void RefreshUI(const USFItemInstance* ItemInstance, ESFItemSlotType SlotType);
 
 protected:
 	// 아이템 이름 (등급 색상 적용)
@@ -47,6 +49,9 @@ protected:
 	// 아이템 설명
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<URichTextBlock> Text_Description;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UTextBlock> Text_Description_1;
 
 	// 페이드인 애니메이션
 	UPROPERTY(meta = (BindWidgetAnim), Transient)

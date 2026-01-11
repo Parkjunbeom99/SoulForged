@@ -17,7 +17,7 @@ USFItemHoverEntryWidget::USFItemHoverEntryWidget(const FObjectInitializer& Objec
 {
 }
 
-void USFItemHoverEntryWidget::RefreshUI(const USFItemInstance* ItemInstance)
+void USFItemHoverEntryWidget::RefreshUI(const USFItemInstance* ItemInstance, ESFItemSlotType SlotType)
 {
     if (ItemInstance == nullptr)
     {
@@ -135,5 +135,23 @@ void USFItemHoverEntryWidget::RefreshUI(const USFItemInstance* ItemInstance)
             Text_Description->SetText(ItemDef->Description);
             Text_Description->SetVisibility(ESlateVisibility::Visible);
         }
+    }
+
+    if (Text_Description_1)
+    {
+        FText ActionText;
+        switch (SlotType)
+        {
+        case ESFItemSlotType::Inventory:
+            ActionText = NSLOCTEXT("SF", "ItemAction_AutoEquip", "자동장착");
+            break;
+        case ESFItemSlotType::Quickbar:
+            ActionText = NSLOCTEXT("SF", "ItemAction_Unequip", "장착해제");
+            break;
+        default:
+            ActionText = FText::GetEmpty();
+            break;
+        }
+        Text_Description_1->SetText(ActionText);
     }
 }

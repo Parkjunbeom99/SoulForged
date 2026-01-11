@@ -6,10 +6,10 @@ USFItemHoverWidget::USFItemHoverWidget(const FObjectInitializer& ObjectInitializ
 {
 }
 
-void USFItemHoverWidget::RefreshUI(const USFItemInstance* ItemInstance)
+void USFItemHoverWidget::RefreshUI(const USFItemInstance* ItemInstance, ESFItemSlotType SlotType)
 {
 	if (Widget_HoverEntry)
 	{
-		Widget_HoverEntry->RefreshUI(ItemInstance);
+		Widget_HoverEntry->RefreshUI(ItemInstance, SlotType);
 	}
 }

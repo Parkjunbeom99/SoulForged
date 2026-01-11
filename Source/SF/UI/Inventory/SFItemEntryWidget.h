@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Item/SFItemManagerComponent.h"
 #include "SFItemEntryWidget.generated.h"
 
 class UTextBlock;
@@ -19,6 +20,8 @@ class SF_API USFItemEntryWidget : public UUserWidget
 
 public:
 	USFItemEntryWidget(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+
+	virtual ESFItemSlotType GetSlotType() const { return ESFItemSlotType::Inventory; }
 
 protected:
 	virtual void NativeOnInitialized() override;
