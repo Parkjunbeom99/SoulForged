@@ -27,6 +27,8 @@ protected:
 	void RefreshCooldown();
 	// 지속시간 갱신용 (Border)
 	void RefreshActiveDuration();
+	// 마나 소모값 갱신용
+	void RefreshManaCost();
 
 	float GetActiveCooldownDuration(UAbilitySystemComponent* ASC, UGameplayAbility* Ability);
 	// 현재 사용중인 스킬로 인해 적용된 지속시간을 찾아내는 헬퍼 함수
@@ -60,6 +62,10 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> Text_KeyPrompt;
 
+	// 소모량 표시 텍스트
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UTextBlock> Text_Cost;
+
 	// 쿨타임 종료 시 재생할 위젯 애니메이션
 	UPROPERTY(Transient , meta = (BindWidgetAnim))
 	TObjectPtr<UWidgetAnimation> Anim_CooldownFinished;
@@ -68,6 +74,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI|Sound")
 	TObjectPtr<USoundBase> CooldownFinishedSound;
 
+protected:
 	UPROPERTY()
 	bool bIsOnCooldown;
 
@@ -76,7 +83,7 @@ protected:
 
 	UPROPERTY()
 	float CooldownEndTime;
-
+	
 	// 이 슬롯이 표시할 어빌리티의 InputTag
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "SF|SkillSlot", meta = (Categories = "InputTag"))
 	FGameplayTag SlotInputTag;
@@ -91,6 +98,10 @@ private:
 
 	int32 CachedChainIndex = INDEX_NONE;
 
+	// 값이 변했을 때만 텍스트를 바꾸기 위한 임시 저장 변수
+	float CachedManaCost = -1.f;
+	
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> SkillBorderDMI;
+	
 };
