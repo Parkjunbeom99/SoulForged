@@ -55,14 +55,56 @@ void USFCommonUpgradeManagerSubsystem::CacheCoreData()
     });
 }
 
-TArray<FSFCommonUpgradeChoice> USFCommonUpgradeManagerSubsystem::GenerateUpgradeOptions(ASFPlayerState* PlayerState, USFCommonLootTable* LootTable, int32 Count)
+TArray<FSFCommonUpgradeChoice> USFCommonUpgradeManagerSubsystem::GenerateUpgradeOptions(ASFPlayerState* PlayerState, USFCommonLootTable* LootTable, int32 Count, FOnUpgradeComplete OnComplete, AActor* SourceInteractable)
 {
-    TArray<FSFCommonUpgradeChoice> NewChoices;
     if (!PlayerState || !LootTable)
     {
-        return NewChoices;
+        return TArray<FSFCommonUpgradeChoice>();
     }
 
+    // 같은 상자에 대한 기존 선택지가 있으면 재사용 (취소 후 재상호작용)
+    FSFCommonUpgradeContext* ExistingContext = ActiveUpgradeContexts.Find(PlayerState);
+    if (ExistingContext && SourceInteractable && ExistingContext->SourceInteractable == SourceInteractable && !ExistingContext->PendingChoices.IsEmpty())
+    {
+        // 콜백만 갱신 (새 어빌리티 인스턴스의 콜백)
+        ExistingContext->OnCompleteCallback = MoveTemp(OnComplete);
+        return ExistingContext->PendingChoices;
+    }
+    
+    // 컨텍스트 저장
+    FSFCommonUpgradeContext& Context = ActiveUpgradeContexts.FindOrAdd(PlayerState);
+    Context.SourceLootTable = LootTable;
+    Context.SourceInteractable = SourceInteractable;
+    Context.SlotCount = Count;
+    Context.OnCompleteCallback = MoveTemp(OnComplete);
+    
+    Context.RerollCount = 0;
+    Context.bUsedFreeReroll = false;
+    Context.bUsedMoreEnhance = false;
+
+    // 선택지 생성
+    Context.PendingChoices = CreateNewChoices(PlayerState, LootTable, Count);
+
+    return Context.PendingChoices;
+}
+
+TArray<FSFCommonUpgradeChoice> USFCommonUpgradeManagerSubsystem::RegenerateChoicesInternal(ASFPlayerState* PlayerState)
+{
+    FSFCommonUpgradeContext* Context = ActiveUpgradeContexts.Find(PlayerState);
+    if (!Context || !Context->SourceLootTable)
+    {
+        return TArray<FSFCommonUpgradeChoice>();
+    }
+
+    // 콜백/소스/리롤카운트 등 보존하면서 선택지만 재생성
+    Context->PendingChoices = CreateNewChoices(PlayerState, Context->SourceLootTable, Context->SlotCount);
+    return Context->PendingChoices;
+}
+
+TArray<FSFCommonUpgradeChoice> USFCommonUpgradeManagerSubsystem::CreateNewChoices(ASFPlayerState* PlayerState, USFCommonLootTable* LootTable, int32 Count)
+{
+    TArray<FSFCommonUpgradeChoice> NewChoices;
+    
     float LuckValue = GetPlayerLuck(PlayerState);
     TSet<USFCommonUpgradeDefinition*> SelectedDefinitions;
 
@@ -107,12 +149,6 @@ TArray<FSFCommonUpgradeChoice> USFCommonUpgradeManagerSubsystem::GenerateUpgrade
 
         NewChoices.Add(Choice);
     }
-
-    // 컨텍스트 저장
-    FSFCommonUpgradeContext& Context = ActiveUpgradeContexts.FindOrAdd(PlayerState);
-    Context.SourceLootTable = LootTable;
-    Context.SlotCount = Count;
-    Context.PendingChoices = NewChoices;
 
     return NewChoices;
 }
@@ -177,25 +213,26 @@ TArray<FSFCommonUpgradeChoice> USFCommonUpgradeManagerSubsystem::TryRerollOption
         Context->RerollCount++;
     }
 
-    // GenerateUpgradeOptions 내부에서 Map을 갱신할 수 있으므로 필요한 정보를 미리 복사
-    USFCommonLootTable* SourceTable = Context->SourceLootTable;
-    int32 SlotCount = Context->SlotCount;
-
     // 찾아낸 테이블과 개수 정보를 사용하여 리롤
-    return GenerateUpgradeOptions(PlayerState, SourceTable, SlotCount);
+    return RegenerateChoicesInternal(PlayerState);
 }
 
-bool USFCommonUpgradeManagerSubsystem::ApplyUpgradeChoice(ASFPlayerState* PlayerState, const FGuid& ChoiceId)
+TArray<FSFCommonUpgradeChoice> USFCommonUpgradeManagerSubsystem::RegenerateChoicesForMoreEnhance(ASFPlayerState* PlayerState)
+{
+    return RegenerateChoicesInternal(PlayerState);
+}
+
+ESFUpgradeApplyResult USFCommonUpgradeManagerSubsystem::ApplyUpgradeChoice(ASFPlayerState* PlayerState, const FGuid& ChoiceId)
 {
     if (!PlayerState || !ChoiceId.IsValid())
     {
-        return false;
+        return ESFUpgradeApplyResult::Failed;
     }
 
     FSFCommonUpgradeContext* Context = ActiveUpgradeContexts.Find(PlayerState);
     if (!Context)
     {
-        return false;
+        return ESFUpgradeApplyResult::Failed;
     }
 
     // PendingChoices에서 해당 ID 찾기
@@ -211,17 +248,17 @@ bool USFCommonUpgradeManagerSubsystem::ApplyUpgradeChoice(ASFPlayerState* Player
     
     if (!FoundChoice)
     {
-        return false;
+        return ESFUpgradeApplyResult::Failed;
     }
     if (!FoundChoice->UpgradeDefinition)
     {
-        return false;
+        return ESFUpgradeApplyResult::Failed;
     }
 
     UAbilitySystemComponent* ASC = PlayerState->GetAbilitySystemComponent();
     if (!ASC)
     {
-        return false;
+        return ESFUpgradeApplyResult::Failed;
     }
 
     // Fragment별 효과 적용
@@ -245,34 +282,43 @@ bool USFCommonUpgradeManagerSubsystem::ApplyUpgradeChoice(ASFPlayerState* Player
     // MoreEnhance 체크: 태그 있고 아직 사용 안 했으면 추가 선택
     if (!Context->bUsedMoreEnhance && ASC->HasMatchingGameplayTag(SFGameplayTags::Ability_Skill_Passive_MoreEnhance))
     {
-        // 상자당 소모
         Context->bUsedMoreEnhance = true;
-        // true 반환하되 Context는 유지 (Component에서 추가 선택 처리)
-        return true; 
+
+        const USFGameData& GameData = USFGameData::Get();
+        if (FMath::FRand() <= GameData.MoreEnhanceChance)
+        {
+            return ESFUpgradeApplyResult::MoreEnhance;
+        }
+        // 확률 실패 → 아래로 진행
+    }
+
+    // 완료 콜백 실행
+    if (Context->OnCompleteCallback.IsBound())
+    {
+        Context->OnCompleteCallback.Execute();
     }
 
     // 컨텍스트 정리
     ActiveUpgradeContexts.Remove(PlayerState);
-
-    return true;
+    return ESFUpgradeApplyResult::Success;
 }
 
-bool USFCommonUpgradeManagerSubsystem::ApplyUpgradeChoiceByIndex(ASFPlayerState* PlayerState, int32 ChoiceIndex)
+ESFUpgradeApplyResult USFCommonUpgradeManagerSubsystem::ApplyUpgradeChoiceByIndex(ASFPlayerState* PlayerState, int32 ChoiceIndex)
 {
     if (!PlayerState)
     {
-        return false;
+        return ESFUpgradeApplyResult::Failed;
     }
 
     FSFCommonUpgradeContext* Context = ActiveUpgradeContexts.Find(PlayerState);
     if (!Context)
     {
-        return false;
+        return ESFUpgradeApplyResult::Failed;
     }
 
     if (!Context->PendingChoices.IsValidIndex(ChoiceIndex))
     {
-        return false;
+        return ESFUpgradeApplyResult::Failed;
     }
 
     return ApplyUpgradeChoice(PlayerState, Context->PendingChoices[ChoiceIndex].UniqueId);

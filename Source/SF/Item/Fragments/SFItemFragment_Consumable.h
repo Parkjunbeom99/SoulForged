@@ -16,6 +16,9 @@ class SF_API USFItemFragment_Consumable : public USFItemFragment
 	GENERATED_BODY()
 
 public:
+
+	// Instance 생성 시 StatContainer에 값 저장
+	virtual void OnInstanceCreated(USFItemInstance* Instance) const override;
 	void ApplySetByCallersToSpec(FGameplayEffectSpec* Spec, const FGameplayTag& RarityTag) const;
 
 public:

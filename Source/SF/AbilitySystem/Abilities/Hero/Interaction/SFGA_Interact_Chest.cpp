@@ -1,6 +1,7 @@
 #include "SFGA_Interact_Chest.h"
 
 #include "Actors/SFChestBase.h"
+#include "Character/SFCharacterBase.h"
 
 
 USFGA_Interact_Chest::USFGA_Interact_Chest(const FObjectInitializer& ObjectInitializer)
@@ -33,6 +34,16 @@ void USFGA_Interact_Chest::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 
 	ChestActor->SetChestState(ESFChestState::Open);
 
+	FlushPressedInput(MoveInputAction);
+	
+	if (ASFCharacterBase* SFCharacter = GetSFCharacterFromActorInfo())
+	{
+		if (UCharacterMovementComponent* CharacterMovement = SFCharacter->GetCharacterMovement())
+		{
+			CharacterMovement->StopMovementImmediately();
+		}
+	}
+	
 	OnChestOpened(ChestActor);
 
 }

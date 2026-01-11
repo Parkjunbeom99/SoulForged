@@ -6,6 +6,8 @@
 #include "Item/SFItemDefinition.h"
 #include "Item/SFItemData.h"
 #include "Item/SFItemRarityConfig.h"
+#include "UI/SFUIData.h"   
+#include "Items/SFItemHoverWidget.h"
 
 USFItemEntryWidget::USFItemEntryWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -28,6 +30,8 @@ void USFItemEntryWidget::NativeConstruct()
 
 void USFItemEntryWidget::NativeDestruct()
 {
+	HideItemHoverWidget();
+	
 	Super::NativeDestruct();
 }
 
@@ -37,7 +41,7 @@ void USFItemEntryWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const F
 
 	Image_Hover->SetVisibility(ESlateVisibility::Visible);
 	
-	// TODO: 툴팁 위젯 표시
+	ShowItemHoverWidget(InMouseEvent);
 }
 
 void USFItemEntryWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
@@ -46,7 +50,19 @@ void USFItemEntryWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
 
 	Image_Hover->SetVisibility(ESlateVisibility::Hidden);
 	
-	// TODO: 툴팁 위젯 숨김
+	HideItemHoverWidget();
+}
+
+FReply USFItemEntryWidget::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	FReply Reply = Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+
+	if (ItemHoverWidget)
+	{
+		ItemHoverWidget->SetPosition(InMouseEvent.GetScreenSpacePosition());
+	}
+
+	return Reply;
 }
 
 FReply USFItemEntryWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
@@ -66,6 +82,8 @@ void USFItemEntryWidget::NativeOnDragDetected(const FGeometry& InGeometry, const
 	Super::NativeOnDragDetected(InGeometry, InMouseEvent, OutOperation);
 
 	SetDragOpacity(true);
+
+	HideItemHoverWidget();
 }
 
 void USFItemEntryWidget::NativeOnDragCancelled(const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
@@ -115,4 +133,37 @@ void USFItemEntryWidget::RefreshItemCount(int32 InItemCount)
 
 	ItemCount = InItemCount;
 	Text_Count->SetText(ItemCount > 1 ? FText::AsNumber(ItemCount) : FText::GetEmpty());
+}
+
+void USFItemEntryWidget::ShowItemHoverWidget(const FPointerEvent& InMouseEvent)
+{
+	if (!ItemInstance)
+	{
+		return;
+	}
+
+	if (!ItemHoverWidget)
+	{
+		TSubclassOf<USFItemHoverWidget> HoverWidgetClass = USFUIData::Get().ItemHoverWidgetClass;
+		if (HoverWidgetClass)
+		{
+			ItemHoverWidget = CreateWidget<USFItemHoverWidget>(GetOwningPlayer(), HoverWidgetClass);
+		}
+	}
+
+	if (ItemHoverWidget)
+	{
+		ItemHoverWidget->RefreshUI(ItemInstance, GetSlotType());
+		ItemHoverWidget->AddToViewport(100);
+		ItemHoverWidget->SetPosition(InMouseEvent.GetScreenSpacePosition());
+	}
+}
+
+void USFItemEntryWidget::HideItemHoverWidget()
+{
+	if (ItemHoverWidget)
+	{
+		ItemHoverWidget->RemoveFromParent();
+		ItemHoverWidget = nullptr;
+	}
 }

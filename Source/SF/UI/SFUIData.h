@@ -5,6 +5,7 @@
 #include "Engine/DataAsset.h"
 #include "SFUIData.generated.h"
 
+class USFItemHoverWidget;
 class USFQuickbarEntryWidget;
 class USFQuickbarSlotWidget;
 class USFInventoryEntryWidget;
@@ -82,6 +83,10 @@ public:
 	//~ 스탯 호버 위젯
 	UPROPERTY(EditDefaultsOnly, Category = "Stat")
 	TSubclassOf<USFStatHoverWidget> StatHoverWidgetClass;
+
+	//~ 아이템 호버 위젯
+	UPROPERTY(EditDefaultsOnly, Category = "Item")
+	TSubclassOf<USFItemHoverWidget> ItemHoverWidgetClass;
 
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "Common", meta = (DisplayName = "Tag UI Infos", Categories = "Stat"))

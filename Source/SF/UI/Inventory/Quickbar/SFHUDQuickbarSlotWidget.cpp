@@ -5,6 +5,7 @@
 #include "Item/SFItemInstance.h"
 #include "Item/SFItemDefinition.h"
 #include "Item/SFItemData.h"
+#include "Item/SFItemRarityConfig.h"
 
 USFHUDQuickbarSlotWidget::USFHUDQuickbarSlotWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -30,6 +31,10 @@ void USFHUDQuickbarSlotWidget::NativeConstruct()
 	if (Image_Icon)
 	{
 		Image_Icon->SetVisibility(ESlateVisibility::Hidden);
+	}
+	if (Image_RarityBG)
+	{
+		Image_RarityBG->SetVisibility(ESlateVisibility::Hidden);
 	}
 	if (Text_Count)
 	{
@@ -94,6 +99,16 @@ void USFHUDQuickbarSlotWidget::OnQuickbarEntryChanged(int32 InSlotIndex, USFItem
 			Image_Icon->SetVisibility(ESlateVisibility::HitTestInvisible);
 		}
 
+		if (Image_RarityBG)
+		{
+			const FGameplayTag& RarityTag = ItemInstance->GetItemRarityTag();
+			if (const USFItemRarityConfig* RarityConfig = USFItemData::Get().FindRarityByTag(RarityTag))
+			{
+				Image_RarityBG->SetBrush(RarityConfig->BackgroundBrush);
+				Image_RarityBG->SetVisibility(ESlateVisibility::HitTestInvisible);
+			}
+		}
+
 		// 수량 표시 (2개 이상일 때만)
 		if (ItemCount > 1)
 		{
@@ -109,6 +124,7 @@ void USFHUDQuickbarSlotWidget::OnQuickbarEntryChanged(int32 InSlotIndex, USFItem
 	{
 		// 아이템 없음
 		Image_Icon->SetVisibility(ESlateVisibility::Hidden);
+		Image_RarityBG->SetVisibility(ESlateVisibility::Hidden);  
 		Text_Count->SetVisibility(ESlateVisibility::Hidden);
 	}
 }
