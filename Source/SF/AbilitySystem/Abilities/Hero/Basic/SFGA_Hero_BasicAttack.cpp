@@ -166,7 +166,7 @@ void USFGA_Hero_BasicAttack::ExecuteAttackStep(int32 StepIndex)
 		ApplySlidingMode(CurrentStep.ChainSlidingMode);
 	}
 
-	// [중요] 입력 캐싱 및 원거리 투영을 적용하여 워핑 타겟을 갱신함
+	// 입력 캐싱 및 원거리 투영을 적용하여 워핑 타겟을 갱신함
 	UpdateWarpTargetFromInput();
 
 	ApplyStepGameplayTags(CurrentStep.TempAbilityTags);
@@ -227,24 +227,34 @@ void USFGA_Hero_BasicAttack::UpdateWarpTargetFromInput()
 	else
 	{
 		// Case B: 락온 아님 -> BasicAttack 고유의 "캐시된 입력(CachedTargetRotation)" 사용
-		UMotionWarpingComponent* MotionWarpingComp = Character->GetComponentByClass<UMotionWarpingComponent>();
-		if (MotionWarpingComp)
+		if (Character->IsLocallyControlled())
 		{
-			FRotator TargetRotation = CachedTargetRotation;
-			TargetRotation.Pitch = 0.f;
-			TargetRotation.Roll = 0.f;
-
-			// Far Projection (캐릭터 회전 방지)
-			const float DirectionalWarpDistance = 10000.f; 
-			FVector TargetLocation = Character->GetActorLocation() + (TargetRotation.Vector() * DirectionalWarpDistance);
-
-			// 워핑 적용
-			MotionWarpingComp->AddOrUpdateWarpTargetFromLocationAndRotation(WarpTargetNameOverride, TargetLocation, TargetRotation);
-
-			// 서버 동기화 (부모 클래스의 RPC 재사용)
-			if (Character->IsLocallyControlled() && !Character->HasAuthority())
+			FVector LiveInput = Character->GetLastMovementInputVector();
+            
+			if (!LiveInput.IsNearlyZero())
 			{
-				ServerSetWarpRotation(WarpTargetNameOverride, TargetRotation);
+				CachedTargetRotation = LiveInput.Rotation();
+			}
+			
+			UMotionWarpingComponent* MotionWarpingComp = Character->GetComponentByClass<UMotionWarpingComponent>();
+			if (MotionWarpingComp)
+			{
+				FRotator TargetRotation = CachedTargetRotation;
+				TargetRotation.Pitch = 0.f;
+				TargetRotation.Roll = 0.f;
+
+				// Far Projection (캐릭터 회전 방지)
+				const float DirectionalWarpDistance = 10000.f; 
+				FVector TargetLocation = Character->GetActorLocation() + (TargetRotation.Vector() * DirectionalWarpDistance);
+
+				// 워핑 적용
+				MotionWarpingComp->AddOrUpdateWarpTargetFromLocationAndRotation(WarpTargetNameOverride, TargetLocation, TargetRotation);
+
+				// 서버 동기화 (부모 클래스의 RPC 재사용)
+				if (Character->IsLocallyControlled() && !Character->HasAuthority())
+				{
+					ServerSetWarpRotation(WarpTargetNameOverride, TargetRotation);
+				}
 			}
 		}
 	}
