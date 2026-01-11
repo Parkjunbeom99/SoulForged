@@ -39,6 +39,9 @@ protected:
 	TObjectPtr<UTextBlock> Text_SlotNumber;
 
 	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UImage> Image_RarityBG;
+
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UImage> Image_Icon;
 
 	UPROPERTY(meta = (BindWidget))
