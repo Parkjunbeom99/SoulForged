@@ -283,6 +283,27 @@ void ASFPlayerState::StartLoadingPawnData()
 	}
 }
 
+void ASFPlayerState::SetGold(const int32 NewGold)
+{
+	if (GetLocalRole() < ROLE_Authority)
+	{
+		return;
+	}
+
+	if (Gold != NewGold)
+	{
+		int32 OldGold = Gold;
+		Gold = NewGold;
+		OnRep_Gold(OldGold);
+		ForceNetUpdate(); 
+	}
+}
+
+void ASFPlayerState::AddGold(const int32 Amount)
+{
+	SetGold(Gold + Amount);
+}
+
 void ASFPlayerState::OnPawnDataLoadComplete(const USFPawnData* LoadedPawnData)
 {
 	UE_LOG(LogSF, Log, TEXT("PawnData load complete for player %s"), *GetPlayerName());
@@ -547,6 +568,10 @@ void ASFPlayerState::OnRep_IsReadyForTravel()
 	MessageSubsystem.BroadcastMessage(SFGameplayTags::Message_Player_TravelReadyChanged, Message);
 }
 
+void ASFPlayerState::OnRep_Gold(int32 OldGold)
+{
+	OnPlayerGoldChanged.Broadcast(Gold, OldGold);
+}
 
 void ASFPlayerState::SetPermanentUpgradeData(const FSFPermanentUpgradeData& InData)
 {

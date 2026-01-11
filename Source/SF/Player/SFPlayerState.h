@@ -28,6 +28,7 @@ class USFPlayerStatsComponent;
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnPawnDataLoaded, const USFPawnData*);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerInfoChangedDelegate, const FSFPlayerSelectionInfo&, NewPlayerSelectionInfo);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnSkillUpgradeCompleted);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnPlayerGoldChanged, int32, NewGold, int32, OldGold);
 
 /** Defines the types of client connected */
 UENUM()
@@ -135,8 +136,8 @@ public:
 	//===========================
 
 	int32 GetGold() const { return Gold; }
-	void SetGold(const int32 NewGold) { Gold = NewGold; }
-	void AddGold(const int32 Amount) { Gold += Amount; }
+	void SetGold(const int32 NewGold);
+	void AddGold(const int32 Amount);
 
 private:
 	void OnPawnDataLoadComplete(const USFPawnData* LoadedPawnData);
@@ -151,13 +152,15 @@ private:
 	UFUNCTION()
 	void OnRep_IsReadyForTravel();
 
+	UFUNCTION()
+	void OnRep_Gold(int32 OldGold);
+
 	// Permanent upgrade apply helper
 	void TryApplyPermanentUpgrade();
 	static bool ArePermanentUpgradeDataEqual(const FSFPermanentUpgradeData& A, const FSFPermanentUpgradeData& B);
 	FTimerHandle PermanentUpgradeRetryTimer;
 	void SchedulePermanentUpgradeRetry();
 	bool bPermanentUpgradeAppliedThisGame = false;
-
 
 public:
 	FOnPawnDataLoaded OnPawnDataLoaded;
@@ -168,6 +171,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "SF|Events")
 	FOnPlayerInfoChangedDelegate OnPlayerInfoChanged;
 
+	UPROPERTY(BlueprintAssignable, Category = "SF|Economy")
+	FOnPlayerGoldChanged OnPlayerGoldChanged;
+	
 private:
 	// 어빌리티 시스템 컴포넌트에서 PawnData를 참조해서 능력을 부여하기 위해 캐싱을 해놓음
 	UPROPERTY(ReplicatedUsing = OnRep_PawnData)
@@ -203,7 +209,7 @@ private:
 	TSharedPtr<FStreamableHandle> PawnDataHandle;
 
 	// 재화
-	UPROPERTY(Replicated)
+	UPROPERTY(ReplicatedUsing = OnRep_Gold)
 	int32 Gold = 0;
 
 	// Seamless Travel 간 ASC 데이터 저장용

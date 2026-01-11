@@ -7,6 +7,8 @@
 class UTextBlock;
 class UImage;
 class USFItemInstance;
+class USFItemHoverWidget;
+
 /**
  * 
  */
@@ -25,6 +27,7 @@ protected:
 
 	virtual void NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual void NativeOnMouseLeave(const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual void NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation) override;
 	virtual void NativeOnDragCancelled(const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
@@ -58,4 +61,11 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> Text_Count;
+
+private:
+	void ShowItemHoverWidget(const FPointerEvent& InMouseEvent);
+	void HideItemHoverWidget();
+
+	UPROPERTY()
+	TObjectPtr<USFItemHoverWidget> ItemHoverWidget;
 };

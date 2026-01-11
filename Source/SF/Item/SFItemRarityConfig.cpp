@@ -9,5 +9,5 @@ float USFItemRarityConfig::GetWeightForLuck(float LuckValue) const
 		Multiplier = LuckWeightCurve->GetFloatValue(LuckValue);
 	}
 
-	return FMath::Max(0.f, BaseDropWeight * Multiplier);
+	return FMath::Max(0.f, BaseDropWeight + Multiplier);
 }
