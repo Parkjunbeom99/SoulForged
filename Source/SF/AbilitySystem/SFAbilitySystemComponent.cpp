@@ -450,7 +450,15 @@ void USFAbilitySystemComponent::SaveAbilitiesToData(FSFSavedAbilitySystemData& O
 		SavedAbility.AbilityLevel = Spec.Level;
 		SavedAbility.DynamicTags = Spec.GetDynamicSpecSourceTags();
 
-		OutData.SavedAbilities.Add(SavedAbility);
+		if (const USFGameplayAbility* Instance = Cast<USFGameplayAbility>(Spec.GetPrimaryInstance()))
+		{
+			if (Instance->HasCustomPersistentData())
+			{
+				SavedAbility.CustomData = Instance->SaveCustomPersistentData();
+			}
+		}
+
+		OutData.SavedAbilities.Add(SavedAbility); 
 	}
 
 	UE_LOG(LogSF, Log, TEXT("SaveAbilitiesToData: Saved %d abilities"), OutData.SavedAbilities.Num());
@@ -475,7 +483,19 @@ void USFAbilitySystemComponent::RestoreAbilitiesFromData(const FSFSavedAbilitySy
 		UGameplayAbility* AbilityCDO = SavedAbility.AbilityClass->GetDefaultObject<UGameplayAbility>();
 		FGameplayAbilitySpec NewSpec(AbilityCDO, SavedAbility.AbilityLevel);
 		NewSpec.GetDynamicSpecSourceTags().AppendTags(SavedAbility.DynamicTags);
-		GiveAbility(NewSpec);
+		FGameplayAbilitySpecHandle Handle = GiveAbility(NewSpec);
+
+		// 커스텀 데이터 복원
+		if (SavedAbility.CustomData.IsValid())
+		{
+			if (FGameplayAbilitySpec* GrantedSpec = FindAbilitySpecFromHandle(Handle))
+			{
+				if (USFGameplayAbility* Instance = Cast<USFGameplayAbility>(GrantedSpec->GetPrimaryInstance()))
+				{
+					Instance->RestoreCustomPersistentData(SavedAbility.CustomData);
+				}
+			}
+		}
 	}
 }
 
