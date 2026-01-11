@@ -5,6 +5,7 @@
 #include "Abilities/GameplayAbility.h"
 #include "Animation/Hero/SFHeroAnimationData.h"
 #include "Character/Hero/Component/SFHeroMovementComponent.h"
+#include "StructUtils/InstancedStruct.h"
 #include "SFGameplayAbility.generated.h"
 
 class USFAbilityCost;
@@ -43,6 +44,15 @@ public:
 
 	virtual bool CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 	virtual void ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const override;
+
+	virtual FInstancedStruct SaveCustomPersistentData() const 
+	{ 
+		return FInstancedStruct(); // 빈 구조체 (데이터 없음)
+	}
+	virtual void RestoreCustomPersistentData(const FInstancedStruct& Data) {}
+	
+	// 커스텀 세이브 데이터 유무
+	virtual bool HasCustomPersistentData() const { return false; }
 
 	UFUNCTION(BlueprintCallable, Category = "SF|Ability")
 	USFAbilitySystemComponent* GetSFAbilitySystemComponentFromActorInfo() const;

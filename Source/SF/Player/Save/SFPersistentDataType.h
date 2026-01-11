@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "AttributeSet.h"
 #include "GameplayTagContainer.h"
+#include "StructUtils/InstancedStruct.h"
 #include "SFPersistentDataType.generated.h"
 
 class UGameplayEffect;
@@ -34,6 +35,9 @@ struct FSFSavedAbility
 
 	UPROPERTY()
 	FGameplayTagContainer DynamicTags;
+
+	UPROPERTY()
+	FInstancedStruct CustomData;
 };
 
 USTRUCT()
