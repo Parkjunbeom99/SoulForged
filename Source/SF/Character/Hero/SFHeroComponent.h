@@ -28,6 +28,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "SF|Hero")
 	static USFHeroComponent* FindHeroComponent(const AActor* Actor) { return (Actor ? Actor->FindComponentByClass<USFHeroComponent>() : nullptr); }
+
+	// 블루프린트(UI 설정창)에서 민감도 값을 변경할 때 호출할 함수
+	UFUNCTION(BlueprintCallable, Category = "SF|Input")
+	void SetMouseSensitivity(float NewSensitivity);
 	
 	/** Overrides the camera from an active gameplay ability */
 	void SetAbilityCameraMode(TSubclassOf<USFCameraMode> CameraMode, const FGameplayAbilitySpecHandle& OwningSpecHandle);
@@ -93,6 +97,10 @@ protected:
 	/** Camera mode set by an ability. */
 	UPROPERTY()
 	TSubclassOf<USFCameraMode> AbilityCameraMode;
+
+	// 실제 적용될 마우스 민감도 값 (기본값 0.5)
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category = "SF|Input")
+	float MouseSensitivity = 0.5f;
 	
 	/** Spec handle for the last ability to set a camera mode. */
 	FGameplayAbilitySpecHandle AbilityCameraModeOwningSpecHandle;
