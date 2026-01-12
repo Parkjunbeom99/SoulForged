@@ -21,6 +21,8 @@
 #include "AbilitySystem/GameplayEvent/SFGameplayEventTags.h"
 #include "Camera/SFCameraMode.h"
 #include "Character/SFCharacterGameplayTags.h"
+#include "Kismet/GameplayStatics.h"
+#include "System/Data/SFSettingsSaveGame.h"
 
 const FName USFHeroComponent::NAME_ActorFeatureName("Hero");
 
@@ -188,6 +190,18 @@ void USFHeroComponent::CheckDefaultInitialization()
 void USFHeroComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// [카메라 민감도 UI 에서 추가] 캐릭터가 태어날 때, 저장된 세이브 파일이 있다면 민감도를 불러와서 적용한
+	if (USFSettingsSaveGame* LoadedData = Cast<USFSettingsSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("Settings"), 0)))
+	{
+		SetMouseSensitivity(LoadedData->MouseSensitivity);
+		UE_LOG(LogTemp, Log, TEXT("[SFHeroComponent] Loaded Sensitivity: %f"), LoadedData->MouseSensitivity);
+	}
+	else
+	{
+		// 세이브 파일이 없다면 기본값(0.5) 유지
+		SetMouseSensitivity(0.5f);
+	}
 
 	// PawnExtensionComponent에 대해서 (PawnExtension Feature) OnActorInitStateChanged() 관찰하도록 (Observing)
 	BindOnActorInitStateChanged(USFPawnExtensionComponent::NAME_ActorFeatureName, FGameplayTag(), false);
@@ -379,14 +393,16 @@ void USFHeroComponent::Input_LookMouse(const FInputActionValue& InputActionValue
 	
 	const FVector2D Value = InputActionValue.Get<FVector2D>();
 
+	// [UI 마우스 민감도 부분에서 수정] X축(좌우) 입력에 민감도(MouseSensitivity)를 곱함
 	if (Value.X != 0.0f)
 	{
-		Pawn->AddControllerYawInput(Value.X);
+		Pawn->AddControllerYawInput(Value.X * MouseSensitivity);
 	}
 
+	// [UI 마우스 민감도 부분에서 수정] Y축(상하) 입력에 민감도(MouseSensitivity)를 곱함
 	if (Value.Y != 0.0f)
 	{
-		Pawn->AddControllerPitchInput(Value.Y);
+		Pawn->AddControllerPitchInput(Value.Y * MouseSensitivity);
 	}
 }
 
@@ -490,6 +506,11 @@ TSubclassOf<USFCameraMode> USFHeroComponent::DetermineCameraMode()
 	}
 
 	return nullptr;
+}
+
+void USFHeroComponent::SetMouseSensitivity(float NewSensitivity)
+{
+	MouseSensitivity = FMath::Max(NewSensitivity, 0.01f);
 }
 
 void USFHeroComponent::SetAbilityCameraMode(TSubclassOf<USFCameraMode> CameraMode, const FGameplayAbilitySpecHandle& OwningSpecHandle)
