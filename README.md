@@ -3,7 +3,10 @@
 
 `Soul Forged`는 언리얼 엔진의 **GAS(Gameplay Ability System)**를 코어 아키텍처로 채택하여 개발된 고성능 멀티플레이어 게임입니다. 단순한 기능 구현을 넘어 모듈화된 프레임워크, 네트워크 최적화, 그리고 데이터 주도형(Data-Driven) 설계를 통해 확장성 있는 게임 구조를 지향합니다.
 
-![Soul Forged Main Screenshot]()
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/6e01bcef-70c7-4707-b62b-33e11b84ff4d" alt="Soul Forged" />
+</p>
+
 
 ---
 
