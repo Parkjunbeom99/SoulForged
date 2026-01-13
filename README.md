@@ -24,7 +24,7 @@
 
 | Demo Video | Ending Cinematic | Presentation |
 | :---: | :---: | :---: |
-| [![Demo](https://img.youtube.com/vi/mScI6zura8E/0.jpg)](https://youtu.be/mScI6zura8E) | [![Ending](https://img.youtube.com/vi/Rgv1000JS2A/0.jpg)](https://youtu.be/Rgv1000JS2A) | [![PPT](https://img.youtube.com/vi/utTe070kYgI/0.jpg)](https://youtu.be/utTe070kYgI) |
+| [![Demo](https://img.youtube.com/vi/mScI6zura8E/0.jpg)](https://youtu.be/mScI6zura8E) | [![Ending](https://img.youtube.com/vi/Rgv1000JS2A/0.jpg)](https://youtu.be/Rgv1000JS2A) | [![PPT]()](https://www.canva.com/design/DAG9z8Sl1V4/CFxDLYju_2sQO6aJiEy08w/edit) |
 
 ---
 
