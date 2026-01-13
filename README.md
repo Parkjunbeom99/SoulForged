@@ -27,7 +27,6 @@
 | :---: | :---: | :---: |
 | [![Demo](https://github.com/user-attachments/assets/29ce31fd-15bc-476f-9364-9f841f99bae0)](https://www.youtube.com/watch?v=5vq2L-Wd2ok&t=302s) | [![Ending](https://github.com/user-attachments/assets/29ce31fd-15bc-476f-9364-9f841f99bae0)](https://www.youtube.com/watch?v=zWCPcy0zPuE&t=6s) | [![PPT](https://github.com/user-attachments/assets/29ce31fd-15bc-476f-9364-9f841f99bae0)](https://www.canva.com/design/DAG9z8Sl1V4/CFxDLYju_2sQO6aJiEy08w/edit) |
 
-|
 
 
 ---
