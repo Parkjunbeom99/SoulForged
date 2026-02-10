@@ -7,11 +7,12 @@
 #include "SFBaseAIController.h"
 #include "AbilitySystem/SFAbilitySystemComponent.h"
 #include "AbilitySystem/Attributes/Enemy/SFCombatSet_Enemy.h"
+#include "AbilitySystem/Attributes/SFPrimarySet.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "Perception/AISense_Sight.h"
 #include "AI/SFAIGameplayTags.h"
-#include "Character/SFCharacterBase.h"         
+#include "Character/SFCharacterBase.h"
 #include "Character/SFCharacterGameplayTags.h"
 #include "Character/Enemy/SFEnemyGameplayTags.h"
 
@@ -20,30 +21,52 @@ USFEnemyCombatComponent::USFEnemyCombatComponent(const FObjectInitializer& Objec
 {
 }
 
+void USFEnemyCombatComponent::BeginDestroy()
+{
+    StopTargetEvaluationTimer();
+    Super::BeginDestroy();
+}
+
 void USFEnemyCombatComponent::InitializeCombatComponent()
 {
     Super::InitializeCombatComponent();
 
-    if (!CachedASC) return;
-
+    if (!CachedASC)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[%s] InitializeCombatComponent: CachedASC is null"), *GetNameSafe(GetOwner()));
+        return;
+    }
+    
     const UAttributeSet* Set = CachedASC->GetAttributeSet(USFCombatSet_Enemy::StaticClass());
     CachedCombatSet = const_cast<USFCombatSet_Enemy*>(Cast<USFCombatSet_Enemy>(Set));
 
-    if (CachedCombatSet)
+    if (!CachedCombatSet)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[%s] InitializeCombatComponent: CachedCombatSet is null"), *GetNameSafe(GetOwner()));
+    }
+    else
     {
         UpdatePerceptionConfig();
     }
     
     AAIController* AIC = GetController<AAIController>();
-    if (AIC)
+    if (!AIC)
     {
-        if (UAIPerceptionComponent* PerceptionComp = AIC->GetPerceptionComponent())
-        {
-            PerceptionComp->OnTargetPerceptionUpdated.AddDynamic(this, &USFEnemyCombatComponent::OnTargetPerceptionUpdated);
-            PerceptionComp->OnPerceptionUpdated.AddDynamic(this, &USFEnemyCombatComponent::OnPerceptionUpdated);
-        }
+        UE_LOG(LogTemp, Warning, TEXT("[%s] InitializeCombatComponent: AIController is null"), *GetNameSafe(GetOwner()));
+        return;
     }
 
+    UAIPerceptionComponent* PerceptionComp = AIC->GetPerceptionComponent();
+    if (!PerceptionComp)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[%s] InitializeCombatComponent: PerceptionComponent is null"), *GetNameSafe(GetOwner()));
+    }
+    else
+    {
+        PerceptionComp->OnTargetPerceptionUpdated.AddDynamic(this, &USFEnemyCombatComponent::OnTargetPerceptionUpdated);
+        PerceptionComp->OnPerceptionUpdated.AddDynamic(this, &USFEnemyCombatComponent::OnPerceptionUpdated);
+    }
+    
     StartTargetEvaluationTimer();
 }
 
@@ -92,9 +115,9 @@ void USFEnemyCombatComponent::OnTargetEvaluationTimer()
 
 void USFEnemyCombatComponent::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
-    if (!Actor || !Actor->ActorHasTag(FName("Player"))) return;
-    
-    if (!IsValidTarget(Actor)) 
+    if (!Actor || !Actor->ActorHasTag(TargetActorTag)) return;
+
+    if (!IsValidTarget(Actor))
     {
         if (CurrentTarget == Actor)
         {
@@ -152,8 +175,8 @@ void USFEnemyCombatComponent::EvaluateTarget()
 
     for (AActor* Actor : PerceivedActors)
     {
-        if (!Actor->ActorHasTag(FName("Player"))) continue;
-        
+        if (!Actor->ActorHasTag(TargetActorTag)) continue;
+
         if (!IsValidTarget(Actor)) continue;
 
         float Score = CalculateTargetScore(Actor);
@@ -163,15 +186,13 @@ void USFEnemyCombatComponent::EvaluateTarget()
             BestTarget = Actor;
         }
     }
-    
+
     UpdateTargetActor(BestTarget);
 }
 
 bool USFEnemyCombatComponent::IsValidTarget(AActor* Target) const
 {
-    if (!Target) return false;
-    
-    if (Target->IsPendingKillPending()) return false;
+    if (!IsValid(Target)) return false;
 
     ASFCharacterBase* TargetChar = Cast<ASFCharacterBase>(Target);
     if (!TargetChar) return false;
@@ -191,18 +212,55 @@ bool USFEnemyCombatComponent::IsValidTarget(AActor* Target) const
 
 float USFEnemyCombatComponent::CalculateTargetScore(AActor* Target) const
 {
-    if (!Target) return -1.f;
+    if (!IsValid(Target)) return -1.f;
+
     APawn* MyPawn = GetOwnerPawn();
-    if (!MyPawn) return -1.f;
+    if (!IsValid(MyPawn)) return -1.f;
 
-    const float Distance = FVector::Dist(MyPawn->GetActorLocation(), Target->GetActorLocation());
-    float Score = FMath::Clamp(1000.f - (Distance / 10.f), 0.f, 1000.f);
+    float TotalScore = 0.f;
 
-    FVector ToTarget = (Target->GetActorLocation() - MyPawn->GetActorLocation()).GetSafeNormal();
-    float Dot = FVector::DotProduct(MyPawn->GetActorForwardVector(), ToTarget);
-    Score += (Dot * 100.f);
+    // 1. 거리 점수 (가까울수록 높음) 
+    const float Distance = FVector::Dist(
+        MyPawn->GetActorLocation(), 
+        Target->GetActorLocation()
+    );
+    
+    const float DistanceScore = FMath::GetMappedRangeValueClamped(
+        FVector2D(0.f, MaxTargetDistance),
+        FVector2D(MaxDistanceScore, 0.f),
+        Distance
+    );
+    TotalScore += DistanceScore * DistanceScoreWeight;  // 가중치 1.0 적용
 
-    return Score;
+    // 각도 점수 (정면에 있을수록 높음) 
+    const FVector ToTarget = (Target->GetActorLocation() - MyPawn->GetActorLocation()).GetSafeNormal();
+    const float Dot = FVector::DotProduct(MyPawn->GetActorForwardVector(), ToTarget);
+    
+    // Dot: -1(뒤) ~ 1(정면) → 0 ~ MaxAngleScore(100)
+    const float AngleScore = ((Dot + 1.f) * 0.5f) * MaxAngleScore;
+    TotalScore += AngleScore * AngleScoreWeight;  // 가중치 1.0 적용
+
+    // 3. 체력 점수 (낮을수록 높음) 
+    if (bConsiderTargetHealth)
+    {
+        if (ASFCharacterBase* TargetChar = Cast<ASFCharacterBase>(Target))
+        {
+            if (USFAbilitySystemComponent* ASC = TargetChar->GetSFAbilitySystemComponent())
+            {
+                if (const USFPrimarySet* PrimarySet = ASC->GetSet<USFPrimarySet>())
+                {
+                    const float HealthRatio = PrimarySet->GetHealth() / 
+                        FMath::Max(PrimarySet->GetMaxHealth(), 1.f);
+                    
+                    // 체력 100% → 0점, 체력 0% → MaxHealthScore(200)점
+                    const float HealthScore = (1.f - HealthRatio) * MaxHealthScore;
+                    TotalScore += HealthScore * HealthScoreWeight;  // 가중치 0.5
+                }
+            }
+        }
+    }
+
+    return TotalScore;
 }
 
 void USFEnemyCombatComponent::UpdateCombatRangeTags()

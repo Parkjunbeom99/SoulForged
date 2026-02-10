@@ -18,13 +18,15 @@ class SF_API USFEnemyCombatComponent : public USFCombatComponentBase
 public:
     USFEnemyCombatComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
+    virtual void BeginDestroy() override;
+
     UFUNCTION(BlueprintPure, Category = "SF|Combat")
     static USFEnemyCombatComponent* FindSFEnemyCombatComponent(const AController* Controller)
     {
         return (Controller ? Controller->FindComponentByClass<USFEnemyCombatComponent>() : nullptr);
     }
 
-    
+
     virtual void InitializeCombatComponent() override;
     
     UFUNCTION()
@@ -59,14 +61,40 @@ protected:
     void OnTargetEvaluationTimer();
 
 protected:
-    
+
     UPROPERTY()
     TObjectPtr<USFCombatSet_Enemy> CachedCombatSet;
 
-    // Target evaluation interval
+    
     UPROPERTY(EditAnywhere, Category = "Combat|Target")
     float TargetEvaluationInterval = 0.5f;
-
-    // Timer handle for periodic evaluation
+    
     FTimerHandle TargetEvaluationTimerHandle;
+    
+    UPROPERTY(EditDefaultsOnly, Category = "Combat|Target")
+    FName TargetActorTag = FName("Player");
+    
+    UPROPERTY(EditDefaultsOnly, Category = "Combat|Scoring")
+    float MaxTargetDistance = 10000.f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Combat|Scoring")
+    float DistanceScoreWeight = 1.0f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Combat|Scoring")
+    float AngleScoreWeight = 1.0f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Combat|Scoring")
+    float MaxDistanceScore = 1000.f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Combat|Scoring")
+    float MaxAngleScore = 100.f;
+    
+    UPROPERTY(EditDefaultsOnly, Category = "Combat|Scoring")
+    bool bConsiderTargetHealth = false;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Combat|Scoring", meta=(EditCondition="bConsiderTargetHealth"))
+    float HealthScoreWeight = 0.5f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Combat|Scoring", meta=(EditCondition="bConsiderTargetHealth"))
+    float MaxHealthScore = 200.f;
 };

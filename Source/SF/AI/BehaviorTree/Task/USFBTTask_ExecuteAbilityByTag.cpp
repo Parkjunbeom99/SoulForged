@@ -6,6 +6,7 @@
 #include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbilityTargetActor.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "BehaviorTree/Blackboard/BlackboardKeyType_Name.h"
 #include "Character/SFCharacterGameplayTags.h"
 #include "AbilitySystem/Abilities/Enemy/Combat/SFGA_Enemy_BaseAttack.h"
 
@@ -16,6 +17,9 @@ UUSFBTTask_ExecuteAbilityByTag::UUSFBTTask_ExecuteAbilityByTag(const FObjectInit
     bNotifyTick = false;
     bNotifyTaskFinished = true;
     bCreateNodeInstance = true;
+
+    // AbilityTagKey는 Name 타입 (FGameplayTag를 FName으로 저장)
+    AbilityTagKey.AddNameFilter(this, GET_MEMBER_NAME_CHECKED(UUSFBTTask_ExecuteAbilityByTag, AbilityTagKey));
 }
 
 UAbilitySystemComponent* UUSFBTTask_ExecuteAbilityByTag::GetASC(UBehaviorTreeComponent& OwnerComp) const
@@ -45,12 +49,14 @@ EBTNodeResult::Type UUSFBTTask_ExecuteAbilityByTag::ExecuteTask(
         return EBTNodeResult::Failed;
     }
 
+    // Blackboard에서 FName으로 저장된 GameplayTag 읽기
     const FName AbilityTagName = BB->GetValueAsName(AbilityTagKey.SelectedKeyName);
-    if (!AbilityTagName.IsValid())
+    if (AbilityTagName.IsNone())
     {
         return EBTNodeResult::Failed;
     }
 
+    // FName을 FGameplayTag로 변환
     FGameplayTag AbilityTag = FGameplayTag::RequestGameplayTag(AbilityTagName, false);
     if (!AbilityTag.IsValid())
     {
@@ -180,4 +186,11 @@ void UUSFBTTask_ExecuteAbilityByTag::CleanupDelegates(UBehaviorTreeComponent& Ow
             AbilityEndedHandle.Reset();
         }
     }
+}
+
+FString UUSFBTTask_ExecuteAbilityByTag::GetStaticDescription() const
+{
+    FString Description = Super::GetStaticDescription();
+    Description += FString::Printf(TEXT("\nAbility Tag Key: %s"), *AbilityTagKey.SelectedKeyName.ToString());
+    return Description;
 }

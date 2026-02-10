@@ -161,9 +161,11 @@ void ASFEnemy::InitializeAbilitySystem()
 	{
 		return;
 	}
-	
+
 	PawnExtComp->InitializeAbilitySystem(AbilitySystemComponent, this);
+
 	InitializeAttributeSet(PawnExtComp);
+
 	GrantAbilitiesFromPawnData();
 }
 
@@ -173,19 +175,25 @@ void ASFEnemy::InitializeAttributeSet(USFPawnExtensionComponent* PawnExtComp)
 	{
 		return;
 	}
-	
+
+	if (!AbilitySystemComponent)
+	{
+		return;
+	}
+
 	const USFEnemyData* EnemyData = PawnExtComp->GetPawnData<USFEnemyData>();
 	if (!EnemyData)
 	{
 		return;
 	}
+
 	USFGameInstance* GI = Cast<USFGameInstance>(GetWorld()->GetGameInstance());
 	if (!GI)
 	{
 		return;
 	}
 
-	// 스케일링 컨텍스트
+	// Get scaling context
 	FSFEnemyScalingContext ScalingContext;
 	if (ASFGameState* SFGameState = GetWorld()->GetGameState<ASFGameState>())
 	{
@@ -194,54 +202,59 @@ void ASFEnemy::InitializeAttributeSet(USFPawnExtensionComponent* PawnExtComp)
 			ScalingContext = StageManager->GetEnemyScalingContext();
 		}
 	}
-	
-	const FEnemyAttributeData* AttrData = GI->EnemyDataMap.Find(EnemyData->EnemyID);
-	TMap<FGameplayTag, float> AttrMap;
-	if (AttrData)
-	{
-		AttrMap.Add(SFGameplayTags::Data_MaxHealth, AttrData->MaxHealth);
-		AttrMap.Add(SFGameplayTags::Data_AttackPower, AttrData->AttackPower);
-		AttrMap.Add(SFGameplayTags::Data_MoveSpeed, AttrData->MoveSpeed);
-		AttrMap.Add(SFGameplayTags::Data_Defense, AttrData->Defense);
-		AttrMap.Add(SFGameplayTags::Data_CriticalDamage, AttrData->CriticalDamage);
-		AttrMap.Add(SFGameplayTags::Data_CriticalChance, AttrData->CriticalChance);
-		AttrMap.Add(SFGameplayTags::Data_Enemy_MaxStagger, AttrData->MaxStagger);
-		AttrMap.Add(SFGameplayTags::Data_Enemy_GuardRange, AttrData->GuardRange);
-		
-		// [수정] 데이터 테이블 값을 불러오지 않도록 주석 처리
-		// 이렇게 하면 컨트롤러(Blueprint)에서 설정한 시야 값을 사용하게 됩니다.
-		// AttrMap.Add(SFGameplayTags::Data_Enemy_SightRadius, AttrData->SightRadius);
-		// AttrMap.Add(SFGameplayTags::Data_Enemy_LoseSightRadius, AttrData->LoseSightRadius);
-		SyncAttributeSet(AttrMap, ScalingContext);
-		
-	}
-	if (IsValid(InitializeEffect))
-	{
-		FGameplayEffectContextHandle EffectContext = AbilitySystemComponent->MakeEffectContext();
-		FGameplayEffectSpecHandle SpecHandle = AbilitySystemComponent->MakeOutgoingSpec(
-			InitializeEffect, 1.0f, EffectContext);
 
-		if (AttrMap.Num() > 0)
-		{
-			for (auto Pair : AttrMap)
-			{
-				SpecHandle.Data->SetSetByCallerMagnitude(Pair.Key, Pair.Value);
-			}
-		}
-		AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data);
+	// Load attribute data
+	const FEnemyAttributeData* AttrData = GI->EnemyDataMap.Find(EnemyData->EnemyID);
+	if (!AttrData)
+	{
+		return;
 	}
+
+	TMap<FGameplayTag, float> AttrMap;
+	AttrMap.Add(SFGameplayTags::Data_MaxHealth, AttrData->MaxHealth);
+	AttrMap.Add(SFGameplayTags::Data_AttackPower, AttrData->AttackPower);
+	AttrMap.Add(SFGameplayTags::Data_MoveSpeed, AttrData->MoveSpeed);
+	AttrMap.Add(SFGameplayTags::Data_Defense, AttrData->Defense);
+	AttrMap.Add(SFGameplayTags::Data_CriticalDamage, AttrData->CriticalDamage);
+	AttrMap.Add(SFGameplayTags::Data_CriticalChance, AttrData->CriticalChance);
+	AttrMap.Add(SFGameplayTags::Data_Enemy_MaxStagger, AttrData->MaxStagger);
+	AttrMap.Add(SFGameplayTags::Data_Enemy_GuardRange, AttrData->GuardRange);
+
+	// Apply scaling
+	SyncAttributeSet(AttrMap, ScalingContext);
+
+	// Apply initialization effect
+	if (!IsValid(InitializeEffect))
+	{
+		return;
+	}
+
+	FGameplayEffectContextHandle EffectContext = AbilitySystemComponent->MakeEffectContext();
+	FGameplayEffectSpecHandle SpecHandle = AbilitySystemComponent->MakeOutgoingSpec(
+		InitializeEffect, 1.0f, EffectContext);
+
+	if (!SpecHandle.IsValid())
+	{
+		return;
+	}
+
+	// Set attribute values
+	for (const auto& Pair : AttrMap)
+	{
+		SpecHandle.Data->SetSetByCallerMagnitude(Pair.Key, Pair.Value);
+	}
+
+	AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data);
 }
 
 void ASFEnemy::SyncAttributeSet(TMap<FGameplayTag, float>& AttrMap, FSFEnemyScalingContext ScalingContext)
 {
 	if (AttrMap.Num() == 0) return;
-	
-	const float HealthPerPlayer = 1.15f; 
-	const float AttackPerPlayer = 0.1f;
-	const float StageMultiplier = 1.f + ((ScalingContext.SubStageIndex - 1) * 0.6f);
-	
-	float PlayerCountFactor = 1.0f + (FMath::Max(0, ScalingContext.PlayerCount - 1) * HealthPerPlayer);
-	float AttackFactor = 1.0f + (FMath::Max(0, ScalingContext.PlayerCount - 1) * AttackPerPlayer);
+
+	const float StageMultiplier = 1.f + ((ScalingContext.SubStageIndex - 1) * StageScalingMultiplier);
+
+	float PlayerCountFactor = 1.0f + (FMath::Max(0, ScalingContext.PlayerCount - 1) * HealthScalingPerPlayer);
+	float AttackFactor = 1.0f + (FMath::Max(0, ScalingContext.PlayerCount - 1) * AttackScalingPerPlayer);
 	
 	for (auto& Pair : AttrMap)
 	{

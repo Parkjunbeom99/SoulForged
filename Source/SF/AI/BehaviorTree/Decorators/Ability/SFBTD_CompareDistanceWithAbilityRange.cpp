@@ -4,15 +4,13 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "AbilitySystem/GameplayEvent/SFGameplayEventTags.h"
+#include "AI/Controller/SFBaseAIController.h"
 
 USFBTD_CompareDistanceWithAbilityRange::USFBTD_CompareDistanceWithAbilityRange()
 {
     NodeName = "Compare Distance With Ability Range";
     bNotifyTick = true;
     FlowAbortMode = EBTFlowAbortMode::Self;
-
-    TargetKey.AddObjectFilter(this, GET_MEMBER_NAME_CHECKED(USFBTD_CompareDistanceWithAbilityRange, TargetKey), AActor::StaticClass());
-    DistanceKey.AddFloatFilter(this, GET_MEMBER_NAME_CHECKED(USFBTD_CompareDistanceWithAbilityRange, DistanceKey));
     AbilityTagKey.AddNameFilter(this, GET_MEMBER_NAME_CHECKED(USFBTD_CompareDistanceWithAbilityRange, AbilityTagKey));
 }
 
@@ -64,22 +62,18 @@ bool USFBTD_CompareDistanceWithAbilityRange::CheckCondition(
     const UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
     if (!BB) return false;
 
-    AActor* Target = Cast<AActor>(BB->GetValueAsObject(TargetKey.SelectedKeyName));
+    ASFBaseAIController* AIC = Cast<ASFBaseAIController>(OwnerComp.GetAIOwner());
+    if (!AIC) return false;
+
+    USFCombatComponentBase* CombatComp = AIC->GetCombatComponent();
+    if (!CombatComp) return false;
+
+    AActor* Target = CombatComp->GetCurrentTarget();
     APawn* Pawn = OwnerComp.GetAIOwner() ? OwnerComp.GetAIOwner()->GetPawn() : nullptr;
     if (!Target || !Pawn) return false;
 
-    // 거리 계산
-    float Distance = 0.f;
-    if (!DistanceKey.IsNone())
-    {
-        Distance = BB->GetValueAsFloat(DistanceKey.SelectedKeyName);
-    }
-    else
-    {
-        Distance = FVector::Dist(Pawn->GetActorLocation(), Target->GetActorLocation());
-    }
+    float Distance = FVector::Dist(Pawn->GetActorLocation(), Target->GetActorLocation());
 
-    // Ability Tag
     if (AbilityTagKey.IsNone())
         return false;
 
@@ -95,7 +89,7 @@ bool USFBTD_CompareDistanceWithAbilityRange::CheckCondition(
 
     if (MaxRange <= 0.f)
         return false;
-    
+
     return Distance > MinRange && Distance <= MaxRange;
 }
 
@@ -121,8 +115,8 @@ void USFBTD_CompareDistanceWithAbilityRange::GetAbilityAttackRange(
         if (!Spec.Ability)
             continue;
 
-        if (Spec.Ability->AbilityTags.HasTag(AbilityTag) ||
-            Spec.Ability->GetAssetTags().HasTag(AbilityTag))
+        if (Spec.Ability->AbilityTags.HasTagExact(AbilityTag) ||
+            Spec.Ability->GetAssetTags().HasTagExact(AbilityTag))
         {
             const float* MaxPtr =
                 Spec.SetByCallerTagMagnitudes.Find(

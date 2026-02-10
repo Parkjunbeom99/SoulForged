@@ -17,9 +17,10 @@ class SF_API USFBTTask_SelectAbilityByTag : public UBTTask_BlackboardBase
 public:
 
 	USFBTTask_SelectAbilityByTag();
-	
+
 	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 
+	virtual FString GetStaticDescription() const override;
 
 protected:
 	UPROPERTY(EditAnywhere, Category = "Ability")

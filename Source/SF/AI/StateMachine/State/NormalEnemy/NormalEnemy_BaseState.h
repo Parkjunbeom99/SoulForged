@@ -6,9 +6,10 @@
 #include "AI/StateMachine/State/SFState.h"
 #include "NormalEnemy_BaseState.generated.h"
 
-/**
- * 
- */
+class ASFBaseAIController;
+class USFCombatComponentBase;
+
+
 UCLASS()
 class SF_API UNormalEnemy_BaseState : public USFState
 {
@@ -17,8 +18,17 @@ class SF_API UNormalEnemy_BaseState : public USFState
 public:
 	virtual void OnEnter_Implementation() override;
 
+protected:
+	
+	ASFBaseAIController* GetAIController() const;
+
+	
+	USFCombatComponentBase* GetCombatComponent() const;
+	
+	bool HasTarget() const;
 
 private:
-	UPROPERTY(EditDefaultsOnly, Category = "BehaviorTag",meta=(AllowPrivateAccess = "true"))
+	/** 이 State가 시작될 때 실행할 BehaviorTree의 태그 */
+	UPROPERTY(EditDefaultsOnly, Category = "BehaviorTag", meta=(AllowPrivateAccess = "true"))
 	FGameplayTag BehaviourTag;
 };

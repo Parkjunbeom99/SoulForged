@@ -154,6 +154,14 @@ void USFState::Initialize(USFStateMachine* InStateMachine, AActor* InOwner)
 {
 	OwnerActor =  InOwner;
 	StateMachine = InStateMachine;
+	if (InOwner)
+	{
+		APawn* OwnerPawn = Cast<APawn>(InOwner);
+		if (OwnerPawn)
+		{
+			OwnerController = OwnerPawn->GetController();
+		}
+	}
 }
 
 void USFState::OnEnter_Implementation()

@@ -6,6 +6,8 @@
 #include "Character/SFCharacterBase.h"
 #include "AbilitySystem/SFAbilitySystemComponent.h"
 #include "AbilitySystem/GameplayEvent/SFGameplayEventTags.h"
+#include "AI/Controller/SFBaseAIController.h"
+#include "AI/Controller/SFCombatComponentBase.h"
 
 USFBTTask_FindAttackPoint::USFBTTask_FindAttackPoint(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
@@ -13,8 +15,8 @@ USFBTTask_FindAttackPoint::USFBTTask_FindAttackPoint(const FObjectInitializer& O
     NodeName = "Find Attack Point (EQS)";
     bCreateNodeInstance = true;
     ResultKeyName.AddVectorFilter(this, GET_MEMBER_NAME_CHECKED(USFBTTask_FindAttackPoint, ResultKeyName));
-    TargetActor.AddObjectFilter(this, GET_MEMBER_NAME_CHECKED(USFBTTask_FindAttackPoint, TargetActor), AActor::StaticClass());
-    AbilityTagKeyName.AddNameFilter(this, GET_MEMBER_NAME_CHECKED(USFBTTask_FindAttackPoint, AbilityTagKeyName));
+    MinRangeKey.AddFloatFilter(this, GET_MEMBER_NAME_CHECKED(USFBTTask_FindAttackPoint, MinRangeKey));
+    MaxRangeKey.AddFloatFilter(this, GET_MEMBER_NAME_CHECKED(USFBTTask_FindAttackPoint, MaxRangeKey));
 }
 
 EBTNodeResult::Type USFBTTask_FindAttackPoint::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
@@ -25,35 +27,23 @@ EBTNodeResult::Type USFBTTask_FindAttackPoint::ExecuteTask(UBehaviorTreeComponen
 
     if (!Character || !Blackboard || !QueryTemplate) return EBTNodeResult::Failed;
 
-    AActor* TargetActorPtr = Cast<AActor>(Blackboard->GetValueAsObject(TargetActor.SelectedKeyName));
-    FName TagName = Blackboard->GetValueAsName(AbilityTagKeyName.SelectedKeyName);
-    FGameplayTag AbilityTag = FGameplayTag::RequestGameplayTag(TagName);
-
-    if (!TargetActorPtr || !AbilityTag.IsValid()) return EBTNodeResult::Failed;
-    
-    float MinDist = 0.f;
-    float MaxDist = 1000.f;
-    USFAbilitySystemComponent* ASC = Character->GetSFAbilitySystemComponent();
-    
-    if (ASC)
+    ASFBaseAIController* SFController = Cast<ASFBaseAIController>(AIController);
+    USFCombatComponentBase* CombatComponent = SFController->GetCombatComponent();
+    AActor* TargetActorPtr = nullptr;
+    if (CombatComponent)
     {
-        for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
-        {
-            if (Spec.Ability && Spec.Ability->AbilityTags.HasTag(AbilityTag))
-            {
-                const float* MinValPtr = Spec.SetByCallerTagMagnitudes.Find(SFGameplayTags::Data_EnemyAbility_MinAttackRange);
-                const float* MaxValPtr = Spec.SetByCallerTagMagnitudes.Find(SFGameplayTags::Data_EnemyAbility_AttackRange);
-
-                if (MinValPtr && MaxValPtr)
-                {
-                    MinDist = *MinValPtr;
-                    MaxDist = *MaxValPtr;
-                }
-                break;
-            }
-        }
+        TargetActorPtr = CombatComponent->GetCurrentTarget();
     }
-    
+    if (!TargetActorPtr) return EBTNodeResult::Failed;
+
+    float MinDist = Blackboard->GetValueAsFloat(MinRangeKey.SelectedKeyName);
+    float MaxDist = Blackboard->GetValueAsFloat(MaxRangeKey.SelectedKeyName);
+
+    if (MaxDist <= 0.f)
+    {
+        MaxDist = 1000.f;
+    }
+
     if (bSkipIfInRange)
     {
         float DistSq = FVector::DistSquared2D(Character->GetActorLocation(), TargetActorPtr->GetActorLocation());
@@ -62,10 +52,10 @@ EBTNodeResult::Type USFBTTask_FindAttackPoint::ExecuteTask(UBehaviorTreeComponen
             return EBTNodeResult::Succeeded;
         }
     }
-    
+
     CachedOwnerComp = &OwnerComp;
     FEnvQueryRequest QueryRequest(QueryTemplate, Character);
-    
+
     QueryRequest.SetFloatParam(FName("MinDistance"), MinDist);
     QueryRequest.SetFloatParam(FName("MaxDistance"), MaxDist);
     QueryRequest.SetFloatParam(FName("OptimalDistance"), (MinDist + MaxDist) * 0.5f);
@@ -91,15 +81,13 @@ void USFBTTask_FindAttackPoint::OnQueryFinished(TSharedPtr<FEnvQueryResult> Resu
     {
         FVector ResultLocation = Result->GetItemAsLocation(0);
 
-        // 4. 드래곤을 위한 정교한 NavMesh 투영
         if (bProjectToNavMesh)
         {
             if (UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld()))
             {
                 FNavLocation ProjectedLocation;
-                // 드래곤의 크기를 고려하여 투영 범위 설정 
                 FVector ProjectionExtent(NavMeshProjectionRadius, NavMeshProjectionRadius, NavMeshProjectionRadius);
-                
+
                 if (NavSys->ProjectPointToNavigation(ResultLocation, ProjectedLocation, ProjectionExtent))
                 {
                     ResultLocation = ProjectedLocation.Location;

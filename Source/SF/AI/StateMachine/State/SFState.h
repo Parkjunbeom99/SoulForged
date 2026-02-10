@@ -179,6 +179,10 @@ protected:
     //OwnerActor
     UPROPERTY(BlueprintReadOnly, Category = "State")
     TObjectPtr<AActor> OwnerActor;
+
+	//OwnerController
+	UPROPERTY(BlueprintReadOnly, Category = "State")
+	TObjectPtr<AController> OwnerController;
 	
 	
 };

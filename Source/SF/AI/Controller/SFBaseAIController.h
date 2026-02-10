@@ -103,7 +103,7 @@ protected:
 
 #pragma region Rotation
 public:
-    
+
     virtual void SetRotationMode(EAIRotationMode NewMode);
     EAIRotationMode GetCurrentRotationMode() const { return CurrentRotationMode; }
 
@@ -118,5 +118,28 @@ protected:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI|Rotation", meta=(ClampMin="0.0", ClampMax="1080.0"))
     float RotationInterpSpeed = 5.f;
+#pragma endregion
+
+#pragma region HomeLocation
+public:
+    
+    UFUNCTION(BlueprintPure, Category = "AI|Home")
+    FVector GetHomeLocation() const { return HomeLocation; }
+    
+    UFUNCTION(BlueprintPure, Category = "AI|Home")
+    float GetDistanceFromHome() const;
+
+    //최대 추적 거리 (스폰 위치 기준) 
+    UFUNCTION(BlueprintPure, Category = "AI|Home")
+    float GetMaxLeashDistance() const { return MaxLeashDistance; }
+
+protected:
+    // 스폰 위치
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Home")
+    FVector HomeLocation;
+
+    // 최대 추적 거리 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|Home")
+    float MaxLeashDistance = 2000.0f;
 #pragma endregion
 };

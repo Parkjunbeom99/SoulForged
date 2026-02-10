@@ -7,8 +7,6 @@
 #include "AI/Controller/SFCombatComponentBase.h"
 #include "SFDragonCombatComponent.generated.h"
 
-struct FSFPhaseData;
-
 UENUM(BlueprintType)
 enum class EBossAttackZone : uint8
 {
@@ -37,7 +35,9 @@ class SF_API USFDragonCombatComponent : public USFCombatComponentBase
 
 public:
     USFDragonCombatComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
-    
+
+    virtual void BeginDestroy() override;
+
     virtual void InitializeCombatComponent() override;
     
     UFUNCTION()
@@ -81,10 +81,6 @@ protected:
     
     bool IsValidTarget(AActor* Target) const;
     bool ShouldForceReleaseTarget(AActor* Target) const;
-
-    void CheckPhaseTransitions();
-
-    void OnHealthChanged(const FOnAttributeChangeData& OnAttributeChangeData);
 
 protected:
     // Target State Machine
@@ -147,17 +143,22 @@ protected:
     FGameplayTag LastSelectedAbilityTag;
 
     UPROPERTY()
-    TArray<FSFPhaseData> PhaseData;
-
-    UPROPERTY()
-    TArray<FSFPhaseData> TriggerPhase;
-
-    FGameplayTag PendingPhaseTag;
-    
-    UPROPERTY()
     TArray<FGameplayTag> RecentAbilityHistory;
-    
+
     UPROPERTY(EditAnywhere, Category = "AI")
     int32 MaxHistorySize = 2;
-    
+
+    // Ability selection weights
+    UPROPERTY(EditAnywhere, Category = "AI|Ability Selection")
+    float RecentAbilityPenalty = 0.3f;
+
+    UPROPERTY(EditAnywhere, Category = "AI|Ability Selection")
+    float RandomVarianceMin = 0.8f;
+
+    UPROPERTY(EditAnywhere, Category = "AI|Ability Selection")
+    float RandomVarianceMax = 1.2f;
+
+    UPROPERTY(EditAnywhere, Category = "AI|Ability Selection")
+    float EliteScoreThreshold = 0.6f;
+
 };

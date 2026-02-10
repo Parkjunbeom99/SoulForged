@@ -98,12 +98,22 @@ protected:
 	UPROPERTY()
 	TArray<FGameplayAbilitySpecHandle> GrantedAbilityHandles;
 
-	UPROPERTY(VisibleAnywhere, Category="Component")
+	UPROPERTY(VisibleAnywhere, Category="Component") 
 	TObjectPtr<class USFEnemyWidgetComponent> EnemyWidgetComponent;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy|InitializeEffect")
 	TSubclassOf<UGameplayEffect> InitializeEffect;
-	
+
+	// Attribute scaling settings
+	UPROPERTY(EditDefaultsOnly, Category = "Enemy|Scaling")
+	float HealthScalingPerPlayer = 1.15f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Enemy|Scaling")
+	float AttackScalingPerPlayer = 0.1f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Enemy|Scaling")
+	float StageScalingMultiplier = 0.6f;
+
 	// [New] 블루프린트에서 몬스터별로 다르게 설정할 락온 소켓 목록 (0번이 기본 타겟)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SF|LockOn")
 	TArray<FName> LockOnSocketCandidates;

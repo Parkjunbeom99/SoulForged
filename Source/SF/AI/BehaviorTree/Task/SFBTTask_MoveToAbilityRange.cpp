@@ -3,82 +3,61 @@
 #include "SFBTTask_MoveToAbilityRange.h"
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
-#include "AbilitySystemGlobals.h"
-#include "AbilitySystemComponent.h"
-#include "AbilitySystem/Abilities/Enemy/Combat/SFGA_Enemy_BaseAttack.h"
-#include "AbilitySystem/Abilities/SFGameplayAbilityTags.h"
-#include "GameplayTagContainer.h"
-#include "AbilitySystem/GameplayEvent/SFGameplayEventTags.h"
+#include "AI/Controller/SFCombatComponentBase.h"
+#include "Interface/SFAIControllerInterface.h"
 
 USFBTTask_MoveToAbilityRange::USFBTTask_MoveToAbilityRange()
 {
 	NodeName = "Move To Ability Range";
 	bNotifyTick = true;
+	bCreateNodeInstance = true;
 
-	SelectedAbilityTagKey.AddNameFilter(this, GET_MEMBER_NAME_CHECKED(USFBTTask_MoveToAbilityRange, SelectedAbilityTagKey));
-	TargetActorKey.AddObjectFilter(this, GET_MEMBER_NAME_CHECKED(USFBTTask_MoveToAbilityRange, TargetActorKey), AActor::StaticClass());
-	DistanceKey.AddFloatFilter(this, GET_MEMBER_NAME_CHECKED(USFBTTask_MoveToAbilityRange, DistanceKey));
-	MoveFailCountKey.AddIntFilter(this, GET_MEMBER_NAME_CHECKED(USFBTTask_MoveToAbilityRange, MoveFailCountKey));
+	MinRangeKey.AddFloatFilter(this, GET_MEMBER_NAME_CHECKED(USFBTTask_MoveToAbilityRange, MinRangeKey));
+	MaxRangeKey.AddFloatFilter(this, GET_MEMBER_NAME_CHECKED(USFBTTask_MoveToAbilityRange, MaxRangeKey));
 }
 
 EBTNodeResult::Type USFBTTask_MoveToAbilityRange::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	AAIController* AIController = OwnerComp.GetAIOwner();
+	if (!AIController) return EBTNodeResult::Failed;
+
+	APawn* Pawn = AIController->GetPawn();
+	if (!Pawn) return EBTNodeResult::Failed;
+
+	ISFAIControllerInterface* AI = Cast<ISFAIControllerInterface>(AIController);
+	if (!AI) return EBTNodeResult::Failed;
+
+	USFCombatComponentBase* Combat = AI->GetCombatComponent();
+	if (!Combat) return EBTNodeResult::Failed;
+
+	AActor* Target = Combat->GetCurrentTarget();
+	if (!Target) return EBTNodeResult::Failed;
+
 	UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
-	APawn* Pawn = AIController ? AIController->GetPawn() : nullptr;
+	if (!BB) return EBTNodeResult::Failed;
 
-	if (!AIController || !BB || !Pawn)
-		return EBTNodeResult::Failed;
+	CachedMinRange = BB->GetValueAsFloat(MinRangeKey.SelectedKeyName);
+	CachedMaxRange = BB->GetValueAsFloat(MaxRangeKey.SelectedKeyName);
 
-	FName TagName = BB->GetValueAsName(SelectedAbilityTagKey.SelectedKeyName);
-	if (TagName == NAME_None)
-		return EBTNodeResult::Failed;
-
-	FGameplayTag AbilityTag = FGameplayTag::RequestGameplayTag(TagName);
-	if (!AbilityTag.IsValid())
-		return EBTNodeResult::Failed;
-
-	UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Pawn);
-	if (!ASC)
-		return EBTNodeResult::Failed;
-
-	FGameplayAbilitySpec* Spec = nullptr;
-	for (FGameplayAbilitySpec& CurrentSpec : ASC->GetActivatableAbilities())
+	if (CachedMaxRange <= 0.0f)
 	{
-		if (!CurrentSpec.Ability) continue;
-
-		if (CurrentSpec.Ability->AbilityTags.HasTag(AbilityTag) ||
-			CurrentSpec.Ability->GetAssetTags().HasTag(AbilityTag))
-		{
-			Spec = &CurrentSpec;
-			break;
-		}
+		CachedMaxRange = 200.0f;
 	}
 
-	if (!Spec || !Spec->Ability)
-		return EBTNodeResult::Failed;
+	float CurrentDistance = FVector::Dist(Pawn->GetActorLocation(), Target->GetActorLocation());
 
-	USFGA_Enemy_BaseAttack* Ability = Cast<USFGA_Enemy_BaseAttack>(Spec->Ability);
-	if (!Ability)
-		return EBTNodeResult::Failed;
-
-	if (Ability->GetAttackType() == EAttackType::Range)
+	if (CurrentDistance <= CachedMaxRange * RangeMultiplier && CurrentDistance >= CachedMinRange)
+	{
 		return EBTNodeResult::Succeeded;
+	}
 
-	const float* AttackRangePtr = Spec->SetByCallerTagMagnitudes.Find(SFGameplayTags::Data_EnemyAbility_AttackRange);
-	CachedAttackRange = AttackRangePtr ? *AttackRangePtr : 200.f;
-
-	float CurrentDistance = BB->GetValueAsFloat(DistanceKey.SelectedKeyName);
-	if (CurrentDistance <= CachedAttackRange * RangeMultiplier)
-		return EBTNodeResult::Succeeded;
-
-	AActor* Target = Cast<AActor>(BB->GetValueAsObject(TargetActorKey.SelectedKeyName));
-	if (!Target)
-		return EBTNodeResult::Failed;
-
-	AIController->MoveToActor(Target, CachedAttackRange * 0.8f);
-	bIsMoving = true;
+	CachedOwnerComp = &OwnerComp;
+	CachedTarget = Target;
 	ElapsedTime = 0.0f;
+	bIsMoving = true;
+
+	float TargetRange = CachedMaxRange * RangeMultiplier;
+	AIController->MoveToActor(Target, TargetRange - AcceptanceRadius);
 
 	return EBTNodeResult::InProgress;
 }
@@ -87,63 +66,78 @@ void USFBTTask_MoveToAbilityRange::TickTask(UBehaviorTreeComponent& OwnerComp, u
 {
 	Super::TickTask(OwnerComp, NodeMemory, DeltaSeconds);
 
-	if (!bIsMoving)
-		return;
+	if (!bIsMoving) return;
 
 	ElapsedTime += DeltaSeconds;
 
 	if (ElapsedTime > MaxDuration)
 	{
 		AAIController* AIController = OwnerComp.GetAIOwner();
-		if (AIController)
-			AIController->StopMovement();
+		if (AIController) AIController->StopMovement();
 
+		bIsMoving = false;
 		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
 		return;
 	}
 
-	UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
-	if (!BB)
+	AAIController* AIController = OwnerComp.GetAIOwner();
+	if (!AIController)
 	{
+		bIsMoving = false;
 		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
 		return;
 	}
 
-	float CurrentDistance = BB->GetValueAsFloat(DistanceKey.SelectedKeyName);
-	if (CurrentDistance <= CachedAttackRange * RangeMultiplier)
-	{
-		AAIController* AIController = OwnerComp.GetAIOwner();
-		if (AIController)
-			AIController->StopMovement();
+	APawn* Pawn = AIController->GetPawn();
+	AActor* Target = CachedTarget.Get();
 
+	if (!Pawn || !Target)
+	{
+		AIController->StopMovement();
+		bIsMoving = false;
+		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
+		return;
+	}
+
+	float CurrentDistance = FVector::Dist(Pawn->GetActorLocation(), Target->GetActorLocation());
+
+	if (CurrentDistance <= CachedMaxRange * RangeMultiplier && CurrentDistance >= CachedMinRange)
+	{
+		AIController->StopMovement();
+		bIsMoving = false;
 		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 	}
+}
+
+EBTNodeResult::Type USFBTTask_MoveToAbilityRange::AbortTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+{
+	AAIController* AIController = OwnerComp.GetAIOwner();
+	if (AIController && bIsMoving)
+	{
+		AIController->StopMovement();
+	}
+
+	bIsMoving = false;
+	CachedOwnerComp.Reset();
+	CachedTarget.Reset();
+
+	return Super::AbortTask(OwnerComp, NodeMemory);
 }
 
 void USFBTTask_MoveToAbilityRange::OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTNodeResult::Type TaskResult)
 {
 	AAIController* AIController = OwnerComp.GetAIOwner();
 	if (AIController && bIsMoving)
-		AIController->StopMovement();
-
-	UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
-	if (BB)
 	{
-		if (TaskResult == EBTNodeResult::Failed)
-		{
-			int32 FailCount = BB->GetValueAsInt(MoveFailCountKey.SelectedKeyName);
-			BB->SetValueAsInt(MoveFailCountKey.SelectedKeyName, FailCount + 1);
-			BB->ClearValue(SelectedAbilityTagKey.SelectedKeyName);
-		}
-		else if (TaskResult == EBTNodeResult::Succeeded)
-		{
-			BB->SetValueAsInt(MoveFailCountKey.SelectedKeyName, 0);
-		}
+		AIController->StopMovement();
 	}
 
 	bIsMoving = false;
 	ElapsedTime = 0.0f;
-	CachedAttackRange = 0.0f;
+	CachedMaxRange = 0.0f;
+	CachedMinRange = 0.0f;
+	CachedOwnerComp.Reset();
+	CachedTarget.Reset();
 
 	Super::OnTaskFinished(OwnerComp, NodeMemory, TaskResult);
 }

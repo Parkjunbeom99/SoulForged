@@ -12,7 +12,7 @@ class USFDropTable;
 class USF_EffectConfig;
 class USFState;
 class UBehaviorTree;
-struct FSFPhaseData;
+class USFBossPhaseDataAsset;
 
 USTRUCT(BlueprintType)
 struct FSFBehaviourWrapper
@@ -103,8 +103,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Montage")
 	FSTTaggedMontageContainer MontageContainer;
 
+	/** Boss Phase 데이터 에셋 (SFBossCombatState에서 사용) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Phase|Boss")
-	TArray<FSFPhaseData> PhaseData;
+	TObjectPtr<USFBossPhaseDataAsset> BossPhaseDataAsset;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Drop")
 	TObjectPtr<USFDropTable> DropTable;

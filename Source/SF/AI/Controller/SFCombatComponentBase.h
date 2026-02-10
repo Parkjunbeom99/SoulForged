@@ -8,8 +8,10 @@
 #include "SFCombatComponentBase.generated.h"
 
 class USFAbilitySystemComponent;
+class UAbilitySystemComponent;
 struct FEnemyAbilitySelectContext;
-
+struct FGameplayAbilitySpec;
+class UGameplayAbility;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCombatStateChanged, bool, bInCombat);
 
 
@@ -28,6 +30,9 @@ public:
     AActor* GetCurrentTarget() const { return CurrentTarget; }
 
     
+    UFUNCTION(BlueprintCallable, Category = "SF|Combat")
+    virtual void ClearTarget();
+
     virtual void UpdateTargetActor(AActor* NewTarget);
 
     
@@ -41,24 +46,52 @@ public:
     FOnCombatStateChanged OnCombatStateChanged;
 
 protected:
-    
+
     virtual void EvaluateTarget() PURE_VIRTUAL(USFCombatComponentBase::EvaluateTarget, );
 
-    
+
     void SetGameplayTagStatus(const FGameplayTag& Tag, bool bActive);
 
-    
+
     APawn* GetOwnerPawn() const;
 
-    
+    // Ability Score 저장해주는 struct
+    struct FAbilityCandidate
+    {
+        FGameplayTag Tag;
+        float Score;
+        const FGameplayAbilitySpec* Spec;
+    };
+
+    FEnemyAbilitySelectContext PrepareAbilityContext(const FEnemyAbilitySelectContext& Context) const;
+
+    FGameplayTag ExtractAbilityTag(
+        const FGameplayTagContainer& AllTags,
+        const FGameplayTagContainer& SearchTags,
+        const UGameplayAbility* Ability
+    ) const;
+
+    void FilterValidAbilities(
+        UAbilitySystemComponent* ASC,
+        const FGameplayTagContainer& SearchTags,
+        const FEnemyAbilitySelectContext& Context,
+        TArray<FAbilityCandidate>& OutCandidates
+    ) const;
+
+    bool SelectWeightedAbility(
+        const TArray<FAbilityCandidate>& Candidates,
+        FGameplayTag& OutSelectedTag
+    ) const;
+
+
     UPROPERTY()
     TObjectPtr<USFAbilitySystemComponent> CachedASC;
 
-    
+
     UPROPERTY()
     TObjectPtr<AActor> CurrentTarget;
 
-    
+
     UPROPERTY(EditDefaultsOnly, Category = "Combat")
     float ScoreDifferenceThreshold = 100.f;
 };

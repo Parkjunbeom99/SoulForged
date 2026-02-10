@@ -166,6 +166,24 @@ bool USFStateMachine::PopState()
 	return true;
 }
 
+bool USFStateMachine::HasStateWithTag(FGameplayTag StateTag) const
+{
+	if (!StateTag.IsValid())
+	{
+		return false;
+	}
+
+	for (const FSFStateSpec& Spec : RegisterStateSpecs)
+	{
+		if (Spec.GetStateTag() == StateTag)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 bool USFStateMachine::IsInState(TSubclassOf<USFState> StateClass) const
 {
 	if (const FSFStateSpec* CurrentSpec = FindStateSpec(CurrentStateHandle))

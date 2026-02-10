@@ -15,6 +15,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystem/SFAbilitySystemComponent.h"
 #include "AbilitySystem/GameplayEvent/SFGameplayEventTags.h"
+#include "BehaviorTree/BlackboardComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(SFBaseAIController)
@@ -122,6 +123,11 @@ void ASFBaseAIController::OnPossess(APawn* InPawn)
 {
     Super::OnPossess(InPawn);
 
+    // 스폰 위치 저장 (엘든링 스타일 복귀용)
+    if (InPawn)
+    {
+        HomeLocation = InPawn->GetActorLocation();
+    }
 }
 
 void ASFBaseAIController::OnUnPossess()
@@ -257,6 +263,11 @@ bool ASFBaseAIController::RunBehaviorTree(UBehaviorTree* BehaviorTree)
     {
         CachedBehaviorTreeComponent = Cast<UBehaviorTreeComponent>(GetBrainComponent());
         CachedBlackboardComponent = GetBlackboardComponent();
+        if (CachedBlackboardComponent)
+        {
+            CachedBlackboardComponent->SetValueAsVector("HomeLocation", HomeLocation);
+            
+        }
     }
     bIsInCombat = false;
     return bSuccess;
@@ -323,19 +334,28 @@ void ASFBaseAIController::SetRotationMode(EAIRotationMode NewMode)
     switch (NewMode)
     {
     case EAIRotationMode::MovementDirection:
-        MoveComp->bOrientRotationToMovement = true; 
-        MoveComp->bUseControllerDesiredRotation = false; 
+        MoveComp->bOrientRotationToMovement = true;
+        MoveComp->bUseControllerDesiredRotation = false;
         break;
 
     case EAIRotationMode::ControllerYaw:
-        MoveComp->bOrientRotationToMovement = false; 
-        MoveComp->bUseControllerDesiredRotation = false; 
+        MoveComp->bOrientRotationToMovement = false;
+        MoveComp->bUseControllerDesiredRotation = false;
         break;
 
-    case EAIRotationMode::None: 
+    case EAIRotationMode::None:
         MoveComp->bOrientRotationToMovement = false;
         MoveComp->bUseControllerDesiredRotation = false;
         MoveComp->RotationRate = FRotator::ZeroRotator;
         break;
     }
+}
+
+float ASFBaseAIController::GetDistanceFromHome() const
+{
+    if (APawn* MyPawn = GetPawn())
+    {
+        return FVector::Dist(MyPawn->GetActorLocation(), HomeLocation);
+    }
+    return 0.0f;
 }

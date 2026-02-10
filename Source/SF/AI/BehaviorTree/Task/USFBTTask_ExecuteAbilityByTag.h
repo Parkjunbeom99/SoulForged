@@ -19,6 +19,8 @@ class SF_API UUSFBTTask_ExecuteAbilityByTag : public UBTTask_BlackboardBase
 public:
 	UUSFBTTask_ExecuteAbilityByTag(const FObjectInitializer& ObjectInitializer);
 
+	virtual FString GetStaticDescription() const override;
+
 protected:
 	virtual EBTNodeResult::Type ExecuteTask(
 		UBehaviorTreeComponent& OwnerComp,
@@ -30,24 +32,25 @@ protected:
 		EBTNodeResult::Type TaskResult) override;
 
 	virtual EBTNodeResult::Type AbortTask(UBehaviorTreeComponent& OwnerComp,uint8* NodeMemory) override;
-	
+
 	void CleanupDelegates(UBehaviorTreeComponent& OwnerComp);
 
 private:
 	UAbilitySystemComponent* GetASC(UBehaviorTreeComponent& OwnerComp) const;
 
 	void OnAbilityEnded(const FAbilityEndedData& EndedData);
-	
 
-	
+
+
 
 private:
 	FDelegateHandle AbilityEndedHandle;
 	TWeakObjectPtr<UBehaviorTreeComponent> CachedOwnerComp;
 
+	// Blackboard에서 읽을 어빌리티 태그 키 (GameplayTag 타입)
 	UPROPERTY(EditAnywhere, Category = "Ability")
 	FBlackboardKeySelector AbilityTagKey;
 
 	UPROPERTY(EditAnywhere, Category = "Ability")
-	FGameplayAbilitySpecHandle ExecutingAbilityHandle; 
+	FGameplayAbilitySpecHandle ExecutingAbilityHandle;
 };

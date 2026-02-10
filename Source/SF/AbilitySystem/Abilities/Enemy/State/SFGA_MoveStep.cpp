@@ -3,7 +3,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
-#include "Abilities/Tasks/AbilityTask_ApplyRootMotionConstantForce.h" 
+#include "Abilities/Tasks/AbilityTask_ApplyRootMotionConstantForce.h"
 #include "AbilitySystem/Abilities/SFGameplayAbilityTags.h"
 #include "AbilitySystem/GameplayEvent/SFGameplayEventTags.h"
 #include "Character/SFCharacterGameplayTags.h"
@@ -12,17 +12,15 @@ USFGA_MoveStep::USFGA_MoveStep()
 {
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 
-    ActivationOwnedTags.AddTag(SFGameplayTags::Ability_Enemy_Movement_Step); 
+    AbilityTags.AddTag(SFGameplayTags::Ability_Enemy_Movement_Step);
+    AbilityTags.AddTag(SFGameplayTags::Character_State_UsingAbility);
+
+    ActivationOwnedTags.AddTag(SFGameplayTags::Ability_Enemy_Movement_Step);
     ActivationOwnedTags.AddTag(SFGameplayTags::Character_State_UsingAbility);
 
-    
-    if (HasAnyFlags(RF_ClassDefaultObject))
-    {
-        FAbilityTriggerData StepTrigger;
-        StepTrigger.TriggerTag = SFGameplayTags::GameplayEvent_MoveStep;
-        StepTrigger.TriggerSource = EGameplayAbilityTriggerSource::GameplayEvent;
-        AbilityTriggers.Add(StepTrigger);
-    }
+    ActivationBlockedTags.AddTag(SFGameplayTags::Character_State_Dead);
+    ActivationBlockedTags.AddTag(SFGameplayTags::Character_State_Stunned);
+    ActivationBlockedTags.AddTag(SFGameplayTags::Character_State_Hit);
 }
 
 void USFGA_MoveStep::ActivateAbility(
@@ -103,4 +101,29 @@ void USFGA_MoveStep::OnMoveStepFinished()
     }
 
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, false, false);
+}
+
+float USFGA_MoveStep::CalcAIScore(const FEnemyAbilitySelectContext& Context) const
+{
+    if (!Context.Self || !Context.Target)
+        return 0.f;
+
+    const float Dist = Context.DistanceToTarget;
+
+    // 거리별 차등 점수
+    if (Dist < 150.f)
+    {
+        return 10000.f;  
+    }
+    else if (Dist < MaxStepRange)
+    {
+        return 5000.f;   
+    }
+
+    return 0.f;
+}
+
+float USFGA_MoveStep::CalcScoreModifier(const FEnemyAbilitySelectContext& Context) const
+{
+    return 0.f;
 }

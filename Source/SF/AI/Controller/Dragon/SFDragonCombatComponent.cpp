@@ -7,8 +7,6 @@
 #include "AbilitySystem/Attributes/Enemy/SFPrimarySet_Enemy.h"
 #include "AbilitySystem/Attributes/SFPrimarySet.h"
 #include "AI/Controller/SFBaseAIController.h"
-#include "AI/StateMachine/SFStateMachine.h"
-#include "AI/StateMachine/State/Boss_Dragon/SFPhaseCondition.h"
 #include "Character/SFCharacterBase.h"
 #include "Character/SFCharacterGameplayTags.h"
 #include "Character/SFPawnExtensionComponent.h"
@@ -20,47 +18,58 @@ USFDragonCombatComponent::USFDragonCombatComponent(const FObjectInitializer& Obj
     PrimaryComponentTick.bCanEverTick = false;
 }
 
+void USFDragonCombatComponent::BeginDestroy()
+{
+    StopSpatialUpdateTimer();
+    StopStateMonitorTimer();
+    StopThreatUpdateTimer();
+    Super::BeginDestroy();
+}
+
 void USFDragonCombatComponent::InitializeCombatComponent()
 {
     Super::InitializeCombatComponent();
-    
+
     AAIController* AIController = Cast<AAIController>(GetOwner());
-    if (!AIController) return;
+    if (!AIController)
+    {
+        UE_LOG(LogTemp, Error, TEXT("[%s] InitializeCombatComponent: AIController is null"), *GetNameSafe(GetOwner()));
+        return;
+    }
 
     APawn* ControlledPawn = AIController->GetPawn();
-    if (!ControlledPawn) return; 
-    
+    if (!ControlledPawn)
+    {
+        UE_LOG(LogTemp, Error, TEXT("[%s] InitializeCombatComponent: ControlledPawn is null"), *GetNameSafe(GetOwner()));
+        return;
+    }
+
+    // Get or cache ASC
     if (!CachedASC)
     {
        CachedASC = Cast<USFAbilitySystemComponent>(UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(ControlledPawn));
     }
 
-    if (CachedASC)
+    if (!CachedASC)
     {
-       const USFPrimarySet_Enemy* PrimarySet = CachedASC->GetSet<USFPrimarySet_Enemy>();
-       if (PrimarySet)
-       {
-          USFPrimarySet_Enemy* Set = const_cast<USFPrimarySet_Enemy*>(PrimarySet);
-          Set->OnTakeDamageDelegate.RemoveDynamic(this, &ThisClass::AddThreat);
-          Set->OnTakeDamageDelegate.AddDynamic(this, &ThisClass::AddThreat);
-       }
-       CachedASC->GetGameplayAttributeValueChangeDelegate(USFPrimarySet::GetHealthAttribute()).AddUObject(this, &ThisClass::OnHealthChanged);
-    }
-    
-    USFPawnExtensionComponent* PawnExtComp = USFPawnExtensionComponent::FindPawnExtensionComponent(ControlledPawn);
-    if (PawnExtComp)
-    {
-       const USFPawnData* PawnData = PawnExtComp->GetPawnData<USFPawnData>();
-       if (const USFEnemyData* EnemyData = Cast<USFEnemyData>(PawnData))
-       {
-          if (EnemyData->PhaseData.Num() > 0)
-          {
-             PhaseData = EnemyData->PhaseData;  
-          }
-          TriggerPhase.Reset();
-       }
+        UE_LOG(LogTemp, Error, TEXT("[%s] InitializeCombatComponent: CachedASC is null"), *GetNameSafe(GetOwner()));
+        return;
     }
 
+    // Setup threat system
+    const USFPrimarySet_Enemy* PrimarySet = CachedASC->GetSet<USFPrimarySet_Enemy>();
+    if (PrimarySet)
+    {
+        USFPrimarySet_Enemy* Set = const_cast<USFPrimarySet_Enemy*>(PrimarySet);
+        Set->OnTakeDamageDelegate.RemoveDynamic(this, &ThisClass::AddThreat);
+        Set->OnTakeDamageDelegate.AddDynamic(this, &ThisClass::AddThreat);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[%s] InitializeCombatComponent: PrimarySet_Enemy not found"), *GetNameSafe(GetOwner()));
+    }
+
+    // Start update timers
     StartSpatialUpdateTimer();
     StartStateMonitorTimer();
     StartThreatUpdateTimer();
@@ -218,28 +227,29 @@ bool USFDragonCombatComponent::SelectAbility(const FEnemyAbilitySelectContext& C
         ContextWithSpec.AbilitySpec = &Spec;
 
         float Score = AIInterface->CalcAIScore(ContextWithSpec);
-        
+
         if (Score > 0.f)
         {
+            // AssetTags의 첫 번째 태그를 우선적으로 사용
             FGameplayTag UniqueTag;
-            for (const FGameplayTag& Tag : AllTags)
+
+            if (Ability->GetAssetTags().Num() > 0)
             {
-                if (SearchTags.HasTagExact(Tag)) { UniqueTag = Tag; break; }
+                UniqueTag = Ability->GetAssetTags().First();
             }
-            
-            if (!UniqueTag.IsValid())
+            else if (Ability->AbilityTags.Num() > 0)
             {
-                UniqueTag = Ability->AbilityTags.Num() > 0 ? Ability->AbilityTags.First() : Ability->GetAssetTags().First();
+                UniqueTag = Ability->AbilityTags.First();
             }
 
             if (UniqueTag.IsValid())
             {
                 if (RecentAbilityHistory.Contains(UniqueTag))
                 {
-                    Score *= 0.3f;
+                    Score *= RecentAbilityPenalty;
                 }
-                
-                Score *= FMath::FRandRange(0.8f, 1.2f);
+
+                Score *= FMath::FRandRange(RandomVarianceMin, RandomVarianceMax);
 
                 Candidates.Add(UniqueTag);
                 Weights.Add(Score);
@@ -248,14 +258,14 @@ bool USFDragonCombatComponent::SelectAbility(const FEnemyAbilitySelectContext& C
     }
 
     if (Candidates.Num() == 0) return false;
-    
+
     float MaxScore = 0.f;
     for (float W : Weights)
     {
         if (W > MaxScore) MaxScore = W;
     }
-    
-    float ScoreThreshold = MaxScore * 0.6f; 
+
+    float ScoreThreshold = MaxScore * EliteScoreThreshold;
     
     TArray<int32> EliteIndices;
     float EliteTotalWeight = 0.f;
@@ -460,12 +470,10 @@ bool USFDragonCombatComponent::IsValidTarget(AActor* Target) const
 
 bool USFDragonCombatComponent::ShouldForceReleaseTarget(AActor* Target) const
 {
-    if (!Target) return true;
+    if (!IsValid(Target)) return true;
 
     if (!Target->HasActorBegunPlay()) return true;
 
-    if (Target->IsPendingKillPending()) return true;
-    
     // 거리 체크
     if (AActor* Owner = GetOwner())
     {
@@ -479,58 +487,13 @@ bool USFDragonCombatComponent::ShouldForceReleaseTarget(AActor* Target) const
     if (SFCharacter)
     {
        USFAbilitySystemComponent* ASC = SFCharacter->GetSFAbilitySystemComponent();
-    	
+
        if (ASC && (ASC->HasMatchingGameplayTag(SFGameplayTags::Character_State_Dead) ||
                    ASC->HasMatchingGameplayTag(SFGameplayTags::Character_State_Downed)))
        {
-          return true; 
+          return true;
        }
     }
 
     return false;
-}
-
-void USFDragonCombatComponent::CheckPhaseTransitions()
-{
-    if (!HasAuthority() || PhaseData.IsEmpty()) return;
-
-    AAIController* AIC = GetController<AAIController>();
-    if (!AIC) return;
-    AActor* Owner = AIC->GetPawn();
-    if (!Owner) return;
-    USFStateMachine* StateMachine = USFStateMachine::FindStateMachineComponent(Owner);
-    if (!StateMachine) return;
-    
-    for (int32 i = PhaseData.Num() - 1; i >= 0; --i)
-    {
-       const FSFPhaseData& Step = PhaseData[i];
-       if (TriggerPhase.Contains(Step)) continue;
-       
-       bool bAllConditionsMet = true;
-       for (auto Condition : Step.Conditions)
-       {
-          if (Condition && !Condition->IsMet(CachedASC, GetOwner()))
-          {
-             bAllConditionsMet = false;
-             break;
-          }
-       }
-       
-       if (bAllConditionsMet)
-       {
-          if (StateMachine->ActivateStateByTag(Step.TargetPhaseTag))
-          {
-             for (int32 j = 0; j <= i; ++j)
-             {
-                TriggerPhase.AddUnique(PhaseData[j]);
-             }
-             break;
-          }
-       }
-    }
-}
-
-void USFDragonCombatComponent::OnHealthChanged(const FOnAttributeChangeData& OnAttributeChangeData)
-{
-    CheckPhaseTransitions();
 }

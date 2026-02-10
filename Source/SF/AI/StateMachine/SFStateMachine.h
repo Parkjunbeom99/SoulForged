@@ -73,6 +73,11 @@ public:
     UFUNCTION(BlueprintCallable, Category = "State Machine")
     bool PopState();
 
+    // 현재 State를 가지고있는지 
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "State Machine")
+    bool HasStateWithTag(FGameplayTag StateTag) const;
+
+
 public:
     FChangeTreeDelegate OnChangeTreeDelegate;
     FStopTreeDelegate OnStopTreeDelegate;
