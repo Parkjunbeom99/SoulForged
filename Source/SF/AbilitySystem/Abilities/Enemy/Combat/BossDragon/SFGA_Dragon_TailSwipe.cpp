@@ -107,9 +107,6 @@ void USFGA_Dragon_TailSwipe::OnTailHit(FGameplayEventData Payload)
 	ApplyDamageToTarget(HitActor, EffectContext);
 
 	ApplyKnockBackToTarget(HitActor, HitResult->ImpactPoint);
-
-	// Pressure 적용 
-	ApplyPressureToTarget(HitActor);
 }
 
 void USFGA_Dragon_TailSwipe::TailLaunchToTarget(AActor* Target, const FVector& HitLocation)
@@ -176,45 +173,25 @@ void USFGA_Dragon_TailSwipe::EndAbility(const FGameplayAbilitySpecHandle Handle,
 
 float USFGA_Dragon_TailSwipe::CalcScoreModifier(const FEnemyAbilitySelectContext& Context) const
 {
-	float Modifier = 0.f; 
+	float Modifier = 0.f;
 
 	const FBossEnemyAbilitySelectContext* BossContext =
 	   static_cast<const FBossEnemyAbilitySelectContext*>(&Context);
 
-	
-	if (BossContext && BossContext->Zone == EBossAttackZone::Melee)
+	if (!BossContext) return Modifier;
+
+	// 근접-중거리
+	if (BossContext->Zone == EBossAttackZone::Melee)
 	{
-		Modifier += 800.f;
+		Modifier += 900.f;
+	}
+	else if (BossContext->Zone == EBossAttackZone::Mid)
+	{
+		Modifier += 700.f;
 	}
 	else
 	{
-		return -1000.f; 
-	}
-
-	if (!Context.Target) return Modifier;
-	
-	if (Context.AngleToTarget < 60.f) // 전방 60도 이내
-	{
-		Modifier += 400.f;
-	}
-	else if (Context.AngleToTarget > 120.f) // 내 뒤에 있음
-	{
-		Modifier -= 1000.f; 
-	}
-
-	UAbilitySystemComponent* TargetASC =
-	   UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Context.Target);
-
-	if (!TargetASC) return Modifier;
-	
-	if (TargetASC->HasMatchingGameplayTag(SFGameplayTags::Dragon_Pressure_Forward))
-	{
-		Modifier += 500.f; // 달라붙은 적을 떼어놓기 위해 우선순위 급상승
-	}
-	
-	if (TargetASC->HasMatchingGameplayTag(SFGameplayTags::Dragon_Pressure_Back))
-	{
-		Modifier -= 300.f;
+		Modifier -= 500.f;
 	}
 
 	return Modifier;

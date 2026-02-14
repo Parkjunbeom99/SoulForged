@@ -59,7 +59,12 @@ public:
     UFUNCTION(BlueprintCallable, Category = "AI|Combat")
     float GetPlayerHealthPercent() const { return PlayerHealthPercent; }
 
-   
+    UFUNCTION(BlueprintCallable, Category = "AI|Phase")
+    void SetCurrentPhase(int32 NewPhase) { CurrentPhase = NewPhase; }
+
+    UFUNCTION(BlueprintPure, Category = "AI|Phase")
+    int32 GetCurrentPhase() const { return CurrentPhase; }
+
     virtual bool SelectAbility(const FEnemyAbilitySelectContext& Context, const FGameplayTagContainer& SearchTags, FGameplayTag& OutSelectedTag) override;
 
 protected:
@@ -123,6 +128,9 @@ protected:
     // Player state
     UPROPERTY()
     float PlayerHealthPercent = 1.0f;
+
+    UPROPERTY(VisibleAnywhere, Category = "AI|Phase")
+    int32 CurrentPhase = 1;
 
     // Update Intervals
     UPROPERTY(EditAnywhere, Category = "AI|Update")

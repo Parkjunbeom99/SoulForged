@@ -36,8 +36,4 @@ namespace SFGameplayTags
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Cooldown_Dragon_TailSwipe);
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Cooldown_Dragon_DiveAttack);
 	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Cooldown_Dragon_Charge);
-
-	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Dragon_Pressure_Forward);
-	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Dragon_Pressure_Back);
-	SF_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Dragon_Pressure_All);
 }

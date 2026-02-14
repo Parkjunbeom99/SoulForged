@@ -4,24 +4,17 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/Enemy/Combat/SFGA_Enemy_BaseAttack.h"
-#include "Interface/ISFDragonPressureInterface.h"
 #include "SFGA_Dragon_TailSwipe.generated.h"
 
 
 UCLASS()
-class SF_API USFGA_Dragon_TailSwipe : public USFGA_Enemy_BaseAttack, public ISFDragonPressureInterface
+class SF_API USFGA_Dragon_TailSwipe : public USFGA_Enemy_BaseAttack
 {
 	GENERATED_BODY()
 
 public:
 	USFGA_Dragon_TailSwipe();
 
-	// ISFDragonPressureInterface 구현
-	virtual EDragonPressureType GetPressureType() const override { return EDragonPressureType::Back; }
-	virtual float GetPressureDuration() const override { return PressureDuration; }
-	virtual TSubclassOf<UGameplayEffect> GetPressureEffectClass() const override { return PressureEffectClass; }
-
-	// CalcScoreModifier 구현
 	virtual float CalcScoreModifier(const FEnemyAbilitySelectContext& Context) const override;
 
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
@@ -49,13 +42,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Dragon|Debug")
 	bool bIsDebug = false;
-
-	// === Pressure Settings ===
-	UPROPERTY(EditDefaultsOnly, Category = "Dragon|Pressure")
-	float PressureDuration = 4.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Dragon|Pressure")
-	TSubclassOf<UGameplayEffect> PressureEffectClass;
 
 private:
 	// Task 참조 저장 (수동 종료를 위해)

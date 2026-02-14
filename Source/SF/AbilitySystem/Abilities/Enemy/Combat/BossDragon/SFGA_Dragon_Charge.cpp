@@ -84,12 +84,9 @@ void USFGA_Dragon_Charge::ActivateAbility(
     {
         return;
     }
-    
+
+    // 정면으로 돌진
     FVector ChargeDir = Dragon->GetActorForwardVector();
-    if (Target)
-    {
-        ChargeDir = (Target->GetActorLocation() - Dragon->GetActorLocation()).GetSafeNormal2D();
-    }
 
     UAbilityTask_ApplyRootMotionConstantForce* ForceTask =
         UAbilityTask_ApplyRootMotionConstantForce::ApplyRootMotionConstantForce(
@@ -97,7 +94,7 @@ void USFGA_Dragon_Charge::ActivateAbility(
             FName("DragonChargeForce"),
             ChargeDir,
             ChargeSpeed,
-            ChargeDuration,   
+            ChargeDuration,
             false,
             nullptr,
             ERootMotionFinishVelocityMode::SetVelocity,
@@ -242,7 +239,7 @@ float USFGA_Dragon_Charge::CalcScoreModifier(const FEnemyAbilitySelectContext& C
         OwnerForward.Normalize();
 
         float DotResult = FVector::DotProduct(OwnerForward, ToTarget);
-        
+
         if (DotResult < 0.8f)
         {
             return -5000.f;
@@ -252,40 +249,34 @@ float USFGA_Dragon_Charge::CalcScoreModifier(const FEnemyAbilitySelectContext& C
     const FBossEnemyAbilitySelectContext* BossContext =
         static_cast<const FBossEnemyAbilitySelectContext*>(&Context);
 
+    if (!BossContext) return 0.f;
+
     float Modifier = 0.f;
-    
-    if (BossContext && BossContext->Zone == EBossAttackZone::OutOfRange)
-    {
-        Modifier += 2000.f;
-    }
 
-    if (BossContext && BossContext->Zone == EBossAttackZone::Long)
-    {
-        Modifier += 1500.f;
-    }
-
-    if (BossContext && BossContext->Zone == EBossAttackZone::Mid)
-    {
-        Modifier += 500.f;
-    }
-
-    if (Context.DistanceToTarget > 5000.f)
+    // 원거리에서 거리 좁히기
+    if (BossContext->Zone == EBossAttackZone::Long)
     {
         Modifier += 1000.f;
     }
-
-    if (!Context.Target)
-        return Modifier;
-
-    UAbilitySystemComponent* TargetASC =
-        UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Context.Target);
-
-    if (!TargetASC)
-        return Modifier;
-    
-    if (TargetASC->HasMatchingGameplayTag(SFGameplayTags::Dragon_Pressure_Back))
+    else if (BossContext->Zone == EBossAttackZone::Mid)
     {
-        Modifier += 500.f;
+        Modifier += 800.f;
+    }
+    else if (BossContext->Zone == EBossAttackZone::Melee)
+    {
+        return -9999.f;
+    }
+
+    // 후반 페이즈에서 더 공격적
+    if (BossContext->CurrentPhase >= 2)
+    {
+        Modifier += 150.f;
+    }
+
+    // 플레이어 체력이 높을 때 압박용
+    if (BossContext->PlayerHealthPercentage > 0.6f)
+    {
+        Modifier += 200.f;
     }
 
     return Modifier;

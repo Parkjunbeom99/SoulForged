@@ -27,7 +27,7 @@ struct FBossEnemyAbilitySelectContext : public FEnemyAbilitySelectContext
 {
 	float PlayerHealthPercentage = 0.0f;
 	EBossAttackZone Zone = EBossAttackZone::None;
-	
+	int32 CurrentPhase = 1;
 };
 
 // This class does not need to be modified.

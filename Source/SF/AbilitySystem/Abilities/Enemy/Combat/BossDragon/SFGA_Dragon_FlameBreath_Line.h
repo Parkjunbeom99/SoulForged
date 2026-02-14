@@ -2,22 +2,17 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/Enemy/Combat/SFGA_Enemy_BaseAttack.h"
-#include "Interface/ISFDragonPressureInterface.h"
 #include "SFGA_Dragon_FlameBreath_Line.generated.h"
 
 class UAbilityTask_PlayMontageAndWait;
 
 UCLASS()
-class SF_API USFGA_Dragon_FlameBreath_Line : public USFGA_Enemy_BaseAttack, public ISFDragonPressureInterface
+class SF_API USFGA_Dragon_FlameBreath_Line : public USFGA_Enemy_BaseAttack
 {
     GENERATED_BODY()
 
 public:
     USFGA_Dragon_FlameBreath_Line();
-
-    virtual EDragonPressureType GetPressureType() const override { return EDragonPressureType::Back; }
-    virtual float GetPressureDuration() const override { return PressureDuration; }
-    virtual TSubclassOf<UGameplayEffect> GetPressureEffectClass() const override { return PressureEffectClass; }
 
     virtual float CalcScoreModifier(const FEnemyAbilitySelectContext& Context) const override;
 
@@ -73,6 +68,9 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category = "Dragon|Breath")
     float BreathTickRate = 1.f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Dragon|Phase")
+    TMap<int32, float> PhaseDamageMultipliers;
     
     UPROPERTY(EditDefaultsOnly, Category = "Dragon|Interrupt")
     float InterruptThreshold = 100.f;
@@ -85,12 +83,6 @@ protected:
     
     UPROPERTY(EditDefaultsOnly, Category = "Dragon|Debug")
     bool bIsDebug = false;
-
-    UPROPERTY(EditDefaultsOnly, Category = "Dragon|Pressure")
-    float PressureDuration = 6.0f;
-
-    UPROPERTY(EditDefaultsOnly, Category = "Dragon|Pressure")
-    TSubclassOf<UGameplayEffect> PressureEffectClass;
 
 private:
     UPROPERTY()
@@ -112,4 +104,6 @@ private:
 
     float AccumulatedInterruptDamage = 0.f;
     FDelegateHandle OnDamageReceivedHandle;
+
+    float CurrentBreathDamage = 0.f;
 };

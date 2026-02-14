@@ -4,24 +4,17 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/Enemy/Combat/SFGA_Enemy_BaseAttack.h"
-#include "Interface/ISFDragonPressureInterface.h"
 #include "SFGA_Dragon_Stomp.generated.h"
 
 
 UCLASS()
-class SF_API USFGA_Dragon_Stomp : public USFGA_Enemy_BaseAttack, public ISFDragonPressureInterface
+class SF_API USFGA_Dragon_Stomp : public USFGA_Enemy_BaseAttack
 {
 	GENERATED_BODY()
 
 public:
 	USFGA_Dragon_Stomp();
 
-	// ISFDragonPressureInterface 구현
-	virtual EDragonPressureType GetPressureType() const override { return EDragonPressureType::All; }
-	virtual float GetPressureDuration() const override { return PressureDuration; }
-	virtual TSubclassOf<UGameplayEffect> GetPressureEffectClass() const override { return PressureEffectClass; }
-
-	
 	virtual float CalcScoreModifier(const FEnemyAbilitySelectContext& Context) const override;
 
 
@@ -51,20 +44,4 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Dragon|Trace")
 	bool bIsDebug = false;
-
-	// === Pressure Settings ===
-	UPROPERTY(EditDefaultsOnly, Category = "Dragon|Pressure")
-	float PressureDuration = 4.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Dragon|Pressure")
-	TSubclassOf<UGameplayEffect> PressureEffectClass;
-	
-	
-
-	
-
-	
-	
-		
-	
 };

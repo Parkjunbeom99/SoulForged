@@ -2,7 +2,6 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/Enemy/Combat/SFGA_Enemy_BaseAttack.h"
-#include "Interface/ISFDragonPressureInterface.h"
 #include "SFGA_Dragon_Bite.generated.h"
 
 /**
@@ -10,16 +9,12 @@
  * Monster Hunter style Grab & Rescue mechanic
  */
 UCLASS()
-class SF_API USFGA_Dragon_Bite : public USFGA_Enemy_BaseAttack, public ISFDragonPressureInterface
+class SF_API USFGA_Dragon_Bite : public USFGA_Enemy_BaseAttack
 {
     GENERATED_BODY()
 
 public:
     USFGA_Dragon_Bite();
-
-    virtual EDragonPressureType GetPressureType() const override { return EDragonPressureType::Forward; }
-    virtual float GetPressureDuration() const override { return PressureDuration; }
-    virtual TSubclassOf<UGameplayEffect> GetPressureEffectClass() const override { return PressureEffectClass; }
 
     virtual float CalcScoreModifier(const FEnemyAbilitySelectContext& Context) const override;
 
@@ -96,13 +91,11 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Dragon|Rescue")
     float StaggerDamageOnRescue = 50.f;
 
-    UPROPERTY(EditDefaultsOnly, Category = "Dragon|Pressure")
-    float PressureDuration = 5.0f;
-
-    UPROPERTY(EditDefaultsOnly, Category = "Dragon|Pressure")
-    TSubclassOf<UGameplayEffect> PressureEffectClass;
+    UPROPERTY(EditDefaultsOnly, Category = "Dragon|Phase")
+    TMap<int32, float> PhaseGrabDurationReduction;
 
 private:
+    float CurrentGrabDuration = 0.f;
     UPROPERTY()
     TWeakObjectPtr<AActor> GrabbedTarget;
     

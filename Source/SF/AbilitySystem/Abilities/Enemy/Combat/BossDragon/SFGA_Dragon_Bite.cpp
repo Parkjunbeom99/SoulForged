@@ -12,6 +12,7 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "AI/Controller/SFEnemyCombatComponent.h"
+#include "AI/Controller/Dragon/SFDragonCombatComponent.h"
 #include "Interface/SFAIControllerInterface.h"
 #include "Kismet/KismetMathLibrary.h"
 
@@ -227,7 +228,6 @@ void USFGA_Dragon_Bite::OnBiteHit(FGameplayEventData Payload)
     TriggerGrabAbilityOnTarget(HitActor);
     AttachTargetToJaw(HitActor);
     GrabbedTarget = HitActor;
-    ApplyPressureToTarget(HitActor);
 
     // 구출 시스템 델리게이트 등록
     CurrentHitCount = 0;
@@ -363,12 +363,31 @@ void USFGA_Dragon_Bite::PlayGrabMontage()
        GrabMontageTask->OnInterrupted.AddDynamic(this, &USFGA_Dragon_Bite::OnMontageInterrupted);
        GrabMontageTask->OnCancelled.AddDynamic(this, &USFGA_Dragon_Bite::OnMontageCancelled);
        GrabMontageTask->ReadyForActivation();
-       
+
+       CurrentGrabDuration = GrabDuration;
+       if (AController* Controller = GetControllerFromActorInfo())
+       {
+           if (APawn* Pawn = Controller->GetPawn())
+           {
+               if (ISFAIControllerInterface* AIC = Cast<ISFAIControllerInterface>(Pawn->GetController()))
+               {
+                   if (USFDragonCombatComponent* DragonCombat = Cast<USFDragonCombatComponent>(AIC->GetCombatComponent()))
+                   {
+                       int32 Phase = DragonCombat->GetCurrentPhase();
+                       if (const float* FoundReduction = PhaseGrabDurationReduction.Find(Phase))
+                       {
+                           CurrentGrabDuration = FMath::Max(1.0f, GrabDuration - *FoundReduction);
+                       }
+                   }
+               }
+           }
+       }
+
        GetWorld()->GetTimerManager().SetTimer(
           GrabDurationTimerHandle,
           this,
           &USFGA_Dragon_Bite::OnGrabMontageCompleted,
-          GrabDuration,
+          CurrentGrabDuration,
           false
        );
     }
@@ -555,31 +574,36 @@ float USFGA_Dragon_Bite::CalcScoreModifier(const FEnemyAbilitySelectContext& Con
     const FBossEnemyAbilitySelectContext* BossContext =
        static_cast<const FBossEnemyAbilitySelectContext*>(&Context);
 
-    
-    if (BossContext && BossContext->Zone == EBossAttackZone::Melee)
+    if (!BossContext) return Modifier;
+
+    // 근접 전용
+    if (BossContext->Zone == EBossAttackZone::Melee)
     {
        Modifier += 1000.f;
     }
+    else
+    {
+       return -9999.f;
+    }
 
-    if (!Context.Target)
-       return Modifier;
-
-    UAbilitySystemComponent* TargetASC =
-       UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Context.Target);
-
-    if (!TargetASC)
-       return Modifier;
-
-    
-    if (TargetASC->HasMatchingGameplayTag(SFGameplayTags::Dragon_Pressure_Back))
+    // 낮은 체력일 때 처형 시도
+    if (BossContext->PlayerHealthPercentage < 0.3f)
     {
        Modifier += 500.f;
     }
-
-    // 이미 Forward Pressure 중이면 감소
-    if (TargetASC->HasMatchingGameplayTag(SFGameplayTags::Dragon_Pressure_Forward))
+    else if (BossContext->PlayerHealthPercentage < 0.5f)
     {
-       Modifier -= 300.f;
+       Modifier += 200.f;
+    }
+
+    // 후반 페이즈에서 더 공격적
+    if (BossContext->CurrentPhase >= 3)
+    {
+       Modifier += 300.f;
+    }
+    else if (BossContext->CurrentPhase >= 2)
+    {
+       Modifier += 150.f;
     }
 
     return Modifier;

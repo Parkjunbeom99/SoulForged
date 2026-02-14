@@ -8,6 +8,7 @@
 #include "AbilitySystem/GameplayCues/Data/SFGameplayCueCosmeticData.h"
 #include "AbilitySystem/GameplayEvent/SFGameplayEventTags.h"
 #include "AI/Controller/SFEnemyCombatComponent.h"
+#include "AI/Controller/Dragon/SFDragonCombatComponent.h"
 #include "Interface/SFAIControllerInterface.h"
 #include "Animation/AnimInstance.h"
 #include "Character/SFCharacterGameplayTags.h"
@@ -174,6 +175,26 @@ void USFGA_Dragon_FlameBreath_Line::TransitionToBreath()
        return;
     }
 
+    float PhaseMultiplier = 1.0f;
+    if (AController* Controller = GetControllerFromActorInfo())
+    {
+        if (APawn* Pawn = Controller->GetPawn())
+        {
+            if (ISFAIControllerInterface* AIC = Cast<ISFAIControllerInterface>(Pawn->GetController()))
+            {
+                if (USFDragonCombatComponent* DragonCombat = Cast<USFDragonCombatComponent>(AIC->GetCombatComponent()))
+                {
+                    int32 Phase = DragonCombat->GetCurrentPhase();
+                    if (const float* FoundMultiplier = PhaseDamageMultipliers.Find(Phase))
+                    {
+                        PhaseMultiplier = *FoundMultiplier;
+                    }
+                }
+            }
+        }
+    }
+    CurrentBreathDamage = BreathDamagePerTick * PhaseMultiplier;
+
     if (GetWorld())
     {
        GetWorld()->GetTimerManager().SetTimer(
@@ -296,11 +317,11 @@ void USFGA_Dragon_FlameBreath_Line::ApplyBreathDamage()
             }
 
          
-            ProcessedVictims.Add(Victim); 
-            
+            ProcessedVictims.Add(Victim);
+
             FGameplayEffectContextHandle EffectContext = MakeEffectContext(CurrentSpecHandle, CurrentActorInfo);
-            ApplyRawDamageToTarget(Victim, BreathDamagePerTick, EffectContext);
-            ApplyPressureToTarget(Victim);
+
+            ApplyRawDamageToTarget(Victim, CurrentBreathDamage, EffectContext);
         }
     }
 }
@@ -540,44 +561,37 @@ float USFGA_Dragon_FlameBreath_Line::CalcScoreModifier(const FEnemyAbilitySelect
 
     if (Context.DistanceToTarget < 1000.f)
     {
-        return -10000.f; 
+        return -10000.f;
     }
 
     float Modifier = 0.f;
 
-    if (BossContext && BossContext->Zone == EBossAttackZone::Mid)
-    {
-       Modifier += 800.f;
-    }
+    if (!BossContext) return Modifier;
 
-    if (BossContext && BossContext->Zone == EBossAttackZone::Long)
+    // 중거리-원거리 최적화
+    if (BossContext->Zone == EBossAttackZone::Mid)
+    {
+       Modifier += 1000.f;
+    }
+    else if (BossContext->Zone == EBossAttackZone::Long)
     {
        Modifier += 600.f;
     }
-
-    if (Context.DistanceToTarget > 2000.f)
+    else if (BossContext->Zone == EBossAttackZone::Melee)
     {
-       Modifier += 500.f;
+       Modifier -= 500.f;
     }
 
-    if (!Context.Target)
-       return Modifier;
-
-    UAbilitySystemComponent* TargetASC =
-       UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Context.Target);
-
-    if (!TargetASC)
-       return Modifier;
-
-    if (!TargetASC->HasMatchingGameplayTag(SFGameplayTags::Dragon_Pressure_Forward) &&
-       !TargetASC->HasMatchingGameplayTag(SFGameplayTags::Dragon_Pressure_Back))
+    // 플레이어 체력이 높을 때 안전한 견제
+    if (BossContext->PlayerHealthPercentage > 0.7f)
     {
        Modifier += 300.f;
     }
 
-    if (TargetASC->HasMatchingGameplayTag(SFGameplayTags::Dragon_Pressure_Back))
+    // 1페이즈 주력기
+    if (BossContext->CurrentPhase == 1)
     {
-       Modifier -= 400.f;
+       Modifier += 200.f;
     }
 
     return FMath::Max(Modifier, 0.f);

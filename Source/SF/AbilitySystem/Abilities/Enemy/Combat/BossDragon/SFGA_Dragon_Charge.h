@@ -28,7 +28,7 @@ protected:
         const FGameplayAbilityActivationInfo ActivationInfo,
         bool bReplicateEndAbility,
         bool bWasCancelled
-    ) override;
+    ) override;                                             
 
     virtual bool CanActivateAbility(
         const FGameplayAbilitySpecHandle Handle,

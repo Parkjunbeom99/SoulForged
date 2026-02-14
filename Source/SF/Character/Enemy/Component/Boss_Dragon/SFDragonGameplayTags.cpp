@@ -31,10 +31,4 @@ namespace SFGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Cooldown_Dragon_TailSwipe, "Ability.Cooldown.Dragon.TailSwipe", "Cooldown for Dragon Tail Swipe");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Cooldown_Dragon_DiveAttack, "Ability.Cooldown.Dragon.DiveAttack", "Cooldown for Dragon Dive Attack");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Cooldown_Dragon_Charge, "Ability.Cooldown.Dragon.Charge", "Cooldown for Dragon Charge");
-
-	// ========== Dragon Pressure Tags ==========
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Dragon_Pressure_Forward, "Dragon.Pressure.Forward", "Player is pressured forward");
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Dragon_Pressure_Back, "Dragon.Pressure.Forward", "Player is pressured Back");
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Dragon_Pressure_All, "Dragon.Pressure.Forward", "Player is pressured All");
-	
 }

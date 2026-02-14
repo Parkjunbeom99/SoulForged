@@ -7,6 +7,7 @@
 #include "AbilitySystem/Abilities/SFGameplayAbility.h"
 #include "AbilitySystem/Abilities/Enemy/SFEnemyAbilityInitializer.h"
 #include "AI/StateMachine/SFStateMachine.h"
+#include "AI/Controller/Dragon/SFDragonCombatComponent.h"
 #include "System/SFGameInstance.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(SFBossCombatState)
@@ -25,7 +26,12 @@ void USFBossCombatState::OnEnter_Implementation()
 	if (PhaseDataAsset)
 	{
 		CurrentPhase = PhaseDataAsset->GetInitialPhase();
-		
+
+		if (USFDragonCombatComponent* DragonCombat = Cast<USFDragonCombatComponent>(GetCombatComponent()))
+		{
+			DragonCombat->SetCurrentPhase(CurrentPhase);
+		}
+
 		if (const FSFBossPhaseConfig* Config = PhaseDataAsset->GetPhaseConfig(CurrentPhase))
 		{
 			GivePhaseAbilities(*Config);
@@ -137,6 +143,11 @@ void USFBossCombatState::TransitionToPhase(int32 NewPhase)
 	// Phase 업데이트
 	int32 OldPhase = CurrentPhase;
 	CurrentPhase = NewPhase;
+
+	if (USFDragonCombatComponent* DragonCombat = Cast<USFDragonCombatComponent>(GetCombatComponent()))
+	{
+		DragonCombat->SetCurrentPhase(NewPhase);
+	}
 
 	// 새 Phase 어빌리티 부여
 	GivePhaseAbilities(*NewConfig);

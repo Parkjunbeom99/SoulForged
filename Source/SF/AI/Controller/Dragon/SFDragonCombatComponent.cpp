@@ -194,6 +194,7 @@ bool USFDragonCombatComponent::SelectAbility(const FEnemyAbilitySelectContext& C
     DragonContext.AngleToTarget = CachedAngle;
     DragonContext.PlayerHealthPercentage = GetPlayerHealthPercent();
     DragonContext.Zone = CurrentZone;
+    DragonContext.CurrentPhase = CurrentPhase;
     
     OutSelectedTag = FGameplayTag();
 

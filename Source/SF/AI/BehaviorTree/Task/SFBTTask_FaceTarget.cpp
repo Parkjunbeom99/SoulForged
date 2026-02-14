@@ -8,7 +8,6 @@
 USFBTTask_FaceTarget::USFBTTask_FaceTarget()
 {
     NodeName = "SF Face Target";
-    TargetKey.AddObjectFilter(this, GET_MEMBER_NAME_CHECKED(USFBTTask_FaceTarget, TargetKey), AActor::StaticClass());
     bNotifyTick = true;
     bNotifyTaskFinished = true;
     AcceptableAngle = 5.0f;
@@ -19,7 +18,7 @@ EBTNodeResult::Type USFBTTask_FaceTarget::ExecuteTask(UBehaviorTreeComponent& Ow
     ASFBaseAIController* AI = Cast<ASFBaseAIController>(OwnerComp.GetAIOwner());
     if (!AI) return EBTNodeResult::Failed;
 
-    AActor* Target = Cast<AActor>(OwnerComp.GetBlackboardComponent()->GetValueAsObject(TargetKey.SelectedKeyName));
+    AActor* Target = AI->GetCombatComponent()->GetCurrentTarget();
     if (!Target) return EBTNodeResult::Failed;
 
     if (ASFDragonController* DragonAI = Cast<ASFDragonController>(AI))
@@ -47,14 +46,12 @@ EBTNodeResult::Type USFBTTask_FaceTarget::ExecuteTask(UBehaviorTreeComponent& Ow
 void USFBTTask_FaceTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
 {
     ASFBaseAIController* AI = Cast<ASFBaseAIController>(OwnerComp.GetAIOwner());
-    AActor* Target = Cast<AActor>(OwnerComp.GetBlackboardComponent()->GetValueAsObject(TargetKey.SelectedKeyName));
-    if (!AI || !Target) { FinishLatentTask(OwnerComp, EBTNodeResult::Failed); return; }
-
+    AActor* Target = AI->GetCombatComponent()->GetCurrentTarget();
     if (ASFDragonController* DragonAI = Cast<ASFDragonController>(AI))
     {
         if (USFTurnInPlaceComponent* TurnComp = DragonAI->GetTurnInPlaceComponent())
         {
-            // 1. [매우 중요] 애니메이션(TIP) 중이면 각도와 상관없이 태스크를 끝내지 않음
+            // 1. 애니메이션(TIP) 중이면 각도와 상관없이 태스크를 끝내지 않음
             if (TurnComp->IsTurning()) 
             {
                 return; 

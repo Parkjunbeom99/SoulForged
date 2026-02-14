@@ -19,8 +19,6 @@ protected:
 
 
 public:
-	UPROPERTY(EditAnywhere, Category = "TargetKey")
-	FBlackboardKeySelector TargetKey;
 	// 허용 각도
 	UPROPERTY(EditAnywhere, Category = "Rotation", meta = (ClampMin = "1.0", ClampMax = "45.0"))
 	float AcceptableAngle = 10.0f;

@@ -31,6 +31,7 @@ public:
 
     //~ Begin ISFAIControllerInterface Interface
     virtual void InitializeAIController() override;
+    UFUNCTION(BlueprintCallable)
     virtual USFCombatComponentBase* GetCombatComponent() const override;
     //~ End ISFAIControllerInterface Interface
 

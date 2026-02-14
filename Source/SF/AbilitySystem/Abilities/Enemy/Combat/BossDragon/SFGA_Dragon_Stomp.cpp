@@ -134,9 +134,6 @@ void USFGA_Dragon_Stomp::EmitShockWave(FGameplayEventData Payload)
 				ApplyDamageToTarget(HitActor, EffectContext);
 				ApplyKnockBackToTarget(HitActor, StompLoc);
 
-				// Pressure 적용
-				ApplyPressureToTarget(HitActor);
-				
 				if (bIsDebug)
 				{
 					DrawDebugLine(
@@ -187,29 +184,26 @@ float USFGA_Dragon_Stomp::CalcScoreModifier(const FEnemyAbilitySelectContext& Co
 	const FBossEnemyAbilitySelectContext* BossContext =
 		static_cast<const FBossEnemyAbilitySelectContext*>(&Context);
 
-	// Melee Zone이면 보너스 점수
-	if (BossContext && BossContext->Zone == EBossAttackZone::Melee)
+	if (!BossContext) return Modifier;
+
+	// 근접 거리 전용
+	if (BossContext->Zone == EBossAttackZone::Melee)
 	{
-		Modifier += 700.f;
+		Modifier += 1000.f;
+	}
+	else if (BossContext->Zone == EBossAttackZone::Mid)
+	{
+		Modifier += 300.f;
+	}
+	else
+	{
+		return -9999.f;
 	}
 
-	if (!Context.Target)
-		return Modifier;
-
-	UAbilitySystemComponent* TargetASC =
-		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Context.Target);
-
-	if (!TargetASC)
-		return Modifier;
-	
-	if (Context.AngleToTarget > 90.f)
+	// 플레이어 체력이 높을 때 견제용
+	if (BossContext->PlayerHealthPercentage > 0.6f)
 	{
-		Modifier += 400.f;
-	}
-	
-	if (TargetASC->HasMatchingGameplayTag(SFGameplayTags::Dragon_Pressure_All))
-	{
-		Modifier -= 200.f;
+		Modifier += 200.f;
 	}
 
 	return Modifier;
