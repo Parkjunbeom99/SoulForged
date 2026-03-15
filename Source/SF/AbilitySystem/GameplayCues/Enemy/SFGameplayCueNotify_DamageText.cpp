@@ -14,20 +14,31 @@ USFGameplayCueNotify_DamageText::USFGameplayCueNotify_DamageText()
 
 bool USFGameplayCueNotify_DamageText::OnExecute_Implementation(AActor* MyTarget, const FGameplayCueParameters& Parameters) const
 {
-	if (!MyTarget) return false;
-	
-	APlayerController* LocalPC = GetWorld()->GetFirstPlayerController();
-	if (!LocalPC || !LocalPC->IsLocalController()) return false;
+	if (!MyTarget)
+	{
+		return false;
+	}
 
+	APlayerController* LocalPC = GetWorld()->GetFirstPlayerController();
+	if (!LocalPC || !LocalPC->IsLocalController())
+	{
+		return false;
+	}
 
 	FGameplayEffectContextHandle ContextHandle = Parameters.EffectContext;
-	if (!ContextHandle.IsValid()) return false;
-	
+	if (!ContextHandle.IsValid())
+	{
+		return false;
+	}
+
 	AActor* InstigatorActor = ContextHandle.GetInstigator();
-	if (!InstigatorActor) return false;
-	
+	if (!InstigatorActor)
+	{
+		return false;
+	}
+
 	AController* InstigatorController = nullptr;
-	
+
 	if (APawn* InstigatorPawn = Cast<APawn>(InstigatorActor))
 	{
 		InstigatorController = InstigatorPawn->GetController();
@@ -36,14 +47,12 @@ bool USFGameplayCueNotify_DamageText::OnExecute_Implementation(AActor* MyTarget,
 	{
 		InstigatorController = InstigatorPS->GetPlayerController();
 	}
-	
 	else if (AController* PC = Cast<AController>(InstigatorActor))
 	{
 		InstigatorController = PC;
 	}
-	
-	
-	if (InstigatorController != LocalPC)
+
+	if (InstigatorController && InstigatorController != LocalPC)
 	{
 		return false;
 	}
@@ -53,7 +62,7 @@ bool USFGameplayCueNotify_DamageText::OnExecute_Implementation(AActor* MyTarget,
 	{
 		HitLocation = HitResult->ImpactPoint;
 	}
-	
+
 	if (USFDamageTextSubSystem* DamageSystem = MyTarget->GetWorld()->GetSubsystem<USFDamageTextSubSystem>())
 	{
 		bool bIsCritical = false;
@@ -61,9 +70,10 @@ bool USFGameplayCueNotify_DamageText::OnExecute_Implementation(AActor* MyTarget,
 		{
 			bIsCritical = SFContext->IsCriticalHit();
 		}
+
 		DamageSystem->ShowDamage(Parameters.RawMagnitude, MyTarget, HitLocation, bIsCritical);
 		return true;
 	}
 
-	return false; 
+	return false;
 }

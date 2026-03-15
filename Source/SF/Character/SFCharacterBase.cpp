@@ -46,7 +46,7 @@ void ASFCharacterBase::DeathTagChanged(FGameplayTag GameplayTag, int NewCount)
 	}
 	else
 	{
-		RegisterToMiniMap();
+		 
 	}
 }
 

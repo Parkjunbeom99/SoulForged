@@ -144,7 +144,7 @@ void USFCombatComponentBase::FilterValidAbilities(
         OutCandidates.Add(Candidate);
     }
 }
-//목적: 가중치 기반 랜덤 선택 (룰렛 휠 알고리즘)
+
 bool USFCombatComponentBase::SelectWeightedAbility(
     const TArray<FAbilityCandidate>& Candidates,
     FGameplayTag& OutSelectedTag

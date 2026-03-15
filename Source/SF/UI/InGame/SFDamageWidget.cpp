@@ -13,35 +13,33 @@ void USFDamageWidget::PlayDamageEffect(float DamageAmount, bool bIsCritical)
 	if (Txt_DamageText)
 	{
 		Txt_DamageText->SetText(FText::AsNumber(FMath::RoundToInt(DamageAmount)));
-        
 
 		if (bIsCritical)
 		{
 			FLinearColor RedColor = FLinearColor::Red;
 			Txt_DamageText->SetColorAndOpacity(FSlateColor(RedColor));
-       
 		}
 		else
 		{
 			FLinearColor WhiteColor = FLinearColor::White;
 			Txt_DamageText->SetColorAndOpacity(FSlateColor(WhiteColor));
-      
 		}
 	}
-	
+
 	if (Anim_PopUp)
 	{
 		GetWorld()->GetTimerManager().ClearTimer(TimerHandle_ReturnToPool);
-		
+
+		StopAnimation(Anim_PopUp);
+
 		PlayAnimation(Anim_PopUp);
-		
+
 		float AnimDuration = Anim_PopUp->GetEndTime();
-		
+
 		GetWorld()->GetTimerManager().SetTimer(TimerHandle_ReturnToPool, this, &USFDamageWidget::OnReturnTimerElapsed, AnimDuration + 0.1f, false);
 	}
 	else
 	{
-
 		OnFinished.Broadcast(this);
 	}
 }

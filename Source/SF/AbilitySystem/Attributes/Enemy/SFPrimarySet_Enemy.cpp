@@ -37,17 +37,32 @@ bool USFPrimarySet_Enemy::PreGameplayEffectExecute(FGameplayEffectModCallbackDat
 
 void USFPrimarySet_Enemy::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
 {
-	
+
 	if (Data.EvaluatedData.Attribute == GetDamageAttribute())
 	{
 		const float DamageDone = GetDamage();
-		
+
 		// 유효한 데미지가 들어왔는지 확인
 		if (DamageDone > 0.0f)
 		{
 			AActor* Instigator = Data.EffectSpec.GetContext().GetInstigator();
-			
+
 			OnTakeDamageDelegate.Broadcast(DamageDone, Instigator);
+
+			//  GameplayCue 수동 호출 - 모든 데미지에 대해 일관되게 데미지 텍스트 표시
+			USFAbilitySystemComponent* SFASC = GetSFAbilitySystemComponent();
+			if (SFASC)
+			{
+				FGameplayCueParameters CueParams;
+				CueParams.RawMagnitude = DamageDone;
+				CueParams.EffectContext = Data.EffectSpec.GetContext();
+
+				// GameplayCue.DamageText 실행
+				SFASC->ExecuteGameplayCue(
+					FGameplayTag::RequestGameplayTag(TEXT("GameplayCue.DamageText")),
+					CueParams
+				);
+			}
 		}
 	}
 	Super::PostGameplayEffectExecute(Data);
